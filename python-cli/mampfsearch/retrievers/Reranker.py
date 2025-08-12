@@ -1,0 +1,44 @@
+from .base import BaseRetriever
+from .RetrievalPoint import RetrievalPoint
+from typing import List
+from mampfsearch.utils import config
+
+class RerankerRetriever(BaseRetriever):
+    
+    def __init__(self, base_retriever: BaseRetriever, reranker: 'Reranker'):
+        """
+        Initialize the RerankerRetriever with a base retriever and a reranker.
+
+        :param base_retriever: Base retriever to get initial results for reranking
+        :param reranker: Reranker to rerank results from the base retriever
+        """
+        self.base_retriever = base_retriever
+        self.reranker = reranker
+    
+    def retrieve(self, query: str, collection_name: str, limit: int) -> List[RetrievalPoint]:
+        initial_points = self.base_retriever.retrieve(query, collection_name, config.PREFETCH_LIMIT)
+
+        documents = [result.text for result in initial_points]
+        reranked_documents = self.reranker.rank(query, documents)
+
+        reranked_points = []
+        for document in reranked_documents.results[:limit]:
+            index = document.doc_id
+            point = initial_points[index]
+
+            # Create a new RetrievalPoint with the reranked score and the original point's attributes
+            new_point = RetrievalPoint(
+                score=document.score,
+                text=point.text,
+                lecture=point.lecture,
+                lecture_position=point.lecture_position,
+                start_time=point.start_time,
+                end_time=point.end_time,
+                position=point.position
+            )
+            reranked_points.append(new_point)
+
+        
+        return reranked_points
+
+        
