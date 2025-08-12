@@ -1,12 +1,13 @@
-import click
 import csv
 from datetime import datetime
 from mampfsearch.benchmark import Benchmark, EvaluationDataset
 from mampfsearch.retrievers import DenseRetriever, HybridRetriever, HybridColbertRerankingRetriever, RerankerRetriever
 from mampfsearch.utils import config
 from pathlib import Path
+import logging
 
-@click.command("benchmark")
+logger = logging.getLogger(__name__)
+
 def benchmark():
     run()
 
@@ -44,7 +45,7 @@ def run():
         for retriever in retrievers:
             dataset_name = dataset_path.stem
             retriever_name = retriever.__class__.__name__
-            click.echo(f"Running benchmark for dataset: {dataset_name}, retriever: {retriever_name}")
+            logger.info(f"Running benchmark for dataset: {dataset_name}, retriever: {retriever_name}")
             dataset = EvaluationDataset(dataset_path)
             benchmark = Benchmark(eval_dataset=dataset, retriever=retriever, name=dataset_name)
             result = benchmark.run()
@@ -59,7 +60,7 @@ def run():
             })
 
             for reranker_name, reranker in rerankers.items():
-                click.echo(f"Running benchmark for dataset: {dataset_name}, retriever: {retriever_name}, reranker: {reranker_name}")
+                logger.info(f"Running benchmark for dataset: {dataset_name}, retriever: {retriever_name}, reranker: {reranker_name}")
                 reranked_benchmark = Benchmark(eval_dataset=dataset, retriever=RerankerRetriever(base_retriever=retriever, reranker=reranker), name=dataset_name)
                 result = reranked_benchmark.run()
 

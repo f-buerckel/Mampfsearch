@@ -1,4 +1,3 @@
-import click
 from .search import search_lectures
 from mampfsearch.utils.prompts import QA_PROMPT, RAG_PROMPT_JSON
 from mampfsearch.utils import config
@@ -6,14 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@click.command(name="ask")
-@click.argument("question", required=True)
-@click.option(
-    "--retriever", "-r",
-    type=click.Choice(["dense", "hybrid", "hybrid+colbert"], case_sensitive=False),
-    default="hybrid+colbert", 
-    help="Type of retriever to use for search"
-)
 def ask(question, retriever):
     """Ask a question and get the answer from the lectures"""
 

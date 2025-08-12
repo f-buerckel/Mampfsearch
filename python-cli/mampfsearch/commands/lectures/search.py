@@ -1,4 +1,3 @@
-import click
 import urllib3
 from mampfsearch.utils import config
 from mampfsearch.utils import helpers
@@ -32,20 +31,6 @@ def search_lectures(term, collection, limit, retriever_type, reranking=False, ex
 
     return responses
 
-@click.command(name="search")
-@click.argument("query")
-@click.option("--limit", "-l", default=3, help="Number of results to return")
-@click.option(
-    "--retriever", "-r",
-    type=click.Choice(["dense", "hybrid", "hybrid+colbert"], case_sensitive=False),
-    default="hybrid+colbert", 
-    help="Type of retriever to use for search"
-)
-@click.option(
-    "--reranking/--no-reranking",
-    default=False,
-    help="Enable or disable reranking"
-)
 def search_lectures_command(query, limit, retriever, reranking):
 
     """Retrieve relevant lecture parts for a given query"""

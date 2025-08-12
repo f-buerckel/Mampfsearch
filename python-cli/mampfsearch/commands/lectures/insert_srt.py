@@ -1,26 +1,9 @@
-import click
 from mampfsearch.utils import config
 from mampfsearch.utils import helpers
 import pysrt
 from tqdm import tqdm
 from pathlib import Path
 
-@click.command("insert-srt")
-@click.argument(
-    "lecture_name",
-    type=str,
-    required=True
-)
-@click.argument(
-    "lecture_position",
-    type=int,
-    required=True
-)
-@click.argument(
-    "srt_file",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
-    required=True,
-)
 def insert_srt_command(lecture_name, lecture_position, srt_file, collection_name=config.LECTURE_COLLECTION_NAME):
     """Insert an SRT file into the lectures collection."""
     insert_srt(lecture_name, lecture_position, srt_file, collection_name)

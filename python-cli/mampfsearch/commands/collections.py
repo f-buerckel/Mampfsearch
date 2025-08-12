@@ -1,16 +1,8 @@
-import click
 from mampfsearch.utils.config import get_qdrant_client
 import logging
 
 logger = logging.getLogger(__name__)
 
-@click.group("collections")
-def collection_commands():
-    """Manage collections of lectures"""
-    pass
-
-@collection_commands.command("delete")
-@click.argument("name", required=True)
 def delete(name):
     client = get_qdrant_client()
     if not client.collection_exists(name):
@@ -20,7 +12,6 @@ def delete(name):
     client.delete_collection(name)
     logger.info(f"Deleted collection {name}")
 
-@collection_commands.command("list")
 def list():
     client = get_qdrant_client()
     collections = client.get_collections().collections
@@ -32,8 +23,6 @@ def list():
     
     return
 
-@collection_commands.command("get")
-@click.argument("name", required=True)
 def get(name):
     client = get_qdrant_client()
     if not client.collection_exists(name):

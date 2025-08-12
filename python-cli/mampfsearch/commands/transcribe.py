@@ -1,5 +1,5 @@
 from mampfsearch.utils import config
-import click
+
 from pathlib import Path
 import subprocess
 import os
@@ -8,18 +8,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@click.command("transcribe")
-@click.argument(
-    "audio_filename",
-    type=str,
-    required=True
-)
-@click.option(
-    "--model",
-    default="medium",
-    show_default=True,
-    help="Whisper model size (e.g., tiny, base, small, medium, large)."
-)
 def transcribe_lecture(audio_filename: str, model: str):
     """
     Transcribes an audio file to SRT using whisper.
@@ -38,7 +26,7 @@ def transcribe_lecture(audio_filename: str, model: str):
     if not host_audio_file_path.exists():
         logger.error(f"Error: Audio file not found at '{host_audio_file_path}'.")
         logger.error(f"Please ensure '{audio_filename}' exists in '{host_audio_dir}'.")
-        raise click.Abort()
+        raise FileExistsError(f"Audio file '{audio_filename}' not found in '{host_audio_dir}'.")
 
     # Ensure the host transcripts directory exists
     os.makedirs(host_transcripts_dir, exist_ok=True)
@@ -85,9 +73,9 @@ def transcribe_lecture(audio_filename: str, model: str):
         else:
             logger.error(f"\nError during transcription. Docker command exited with code {process.returncode}.", err=True)
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         logger.error("Error: 'docker' command not found. Is Docker installed and in your PATH?", err=True)
-        raise click.Abort()
+        raise e
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", err=True)
-        raise click.Abort()
+        raise e

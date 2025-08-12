@@ -1,16 +1,9 @@
-import click
 import re
 import srt
 from copy import copy
 import logging
 
 logger = logging.getLogger(__name__)
-
-@click.command(name="chunk")
-@click.argument("srt_file", type=click.Path(exists=True))
-@click.argument("min_chunk_size", type=int)
-@click.option("--output", "-o", default="chunked.srt", help="Output file")
-@click.option("--overlap/--no-overlap", default=False, help="Include previous and next sentence in each chunk")
 
 def chunk_srt_command(srt_file, min_chunk_size, output, overlap):
     """Optimizes chunk size of SRT files for better semantic search results"""

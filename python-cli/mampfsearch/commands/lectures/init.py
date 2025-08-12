@@ -1,10 +1,8 @@
-import click
 from mampfsearch.utils import config
 import logging
 
 logger = logging.getLogger(__name__)
 
-@click.command("init")
 def init():
     """Initialize the collection for lectures"""
     create_lectures_collection()
