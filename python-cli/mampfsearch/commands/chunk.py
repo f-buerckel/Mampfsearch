@@ -2,6 +2,9 @@ import click
 import re
 import srt
 from copy import copy
+import logging
+
+logger = logging.getLogger(__name__)
 
 @click.command(name="chunk")
 @click.argument("srt_file", type=click.Path(exists=True))
@@ -13,9 +16,9 @@ def chunk_srt_command(srt_file, min_chunk_size, output, overlap):
     """Optimizes chunk size of SRT files for better semantic search results"""
     result = chunk_srt(srt_file, min_chunk_size, output, overlap)
     if result == -1:
-        click.echo("Error processing SRT file", err=True)
+        logger.info("Error processing SRT file", err=True)
     else:
-        click.echo(f"Successfully chunked SRT to {output}")
+        logger.info(f"Successfully chunked SRT to {output}")
 
 def get_srt(file_path):
     if not file_path.endswith(".srt"):
@@ -28,7 +31,7 @@ def chunk_srt(srt_file, min_chunk_size, output_file, overlap):
     try: 
         subs = list(get_srt(srt_file))
     except (FileNotFoundError, ValueError) as e:
-        click.echo(e, err=True)
+        logger.info(e, err=True)
         return -1
     
     # Split subtitles at periods
@@ -46,7 +49,7 @@ def chunk_srt(srt_file, min_chunk_size, output_file, overlap):
     # Split large chunks if they exceed max_chunk_size
     max_chunk_size = 750
     if max_chunk_size < min_chunk_size:
-        click.echo(f"Warning: max_chunk_size ({max_chunk_size}) is smaller than min_chunk_size ({min_chunk_size}).", err=True)
+        logger.info(f"Warning: max_chunk_size ({max_chunk_size}) is smaller than min_chunk_size ({min_chunk_size}).", err=True)
         raise ValueError("max_chunk_size must be greater than or equal to min_chunk_size.")
     final_subtitles = split_large_chunks(merged_subtitles, max_chunk_size)
 

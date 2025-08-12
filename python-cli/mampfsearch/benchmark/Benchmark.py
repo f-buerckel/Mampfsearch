@@ -2,9 +2,9 @@ from .EvaluationDataset import EvaluationDataset
 from mampfsearch.retrievers import BaseRetriever
 from mampfsearch.commands.lectures.init import create_lectures_collection
 from mampfsearch.commands.lectures.insert_srt import insert_srt
+import logging
 import time
 import math
-import click
 
 class Benchmark:
 
@@ -12,6 +12,7 @@ class Benchmark:
         self.eval_dataset = eval_dataset
         self.retriever = retriever
         self.collection_name = name + "benchmark"
+        self.logger = logging.getLogger(__name__)
     
     def _init_collection(self):
         # only insert srt if collection does not exist
@@ -27,7 +28,7 @@ class Benchmark:
         self._init_collection()
 
         start_time = time.time()
-        click.echo(f"Running benchmark on collection '{self.collection_name}' with {len(self.eval_dataset)} questions.")
+        self.logger.info(f"Running benchmark on collection '{self.collection_name}' with {len(self.eval_dataset)} questions.")
 
         score_sum = 0.0
         for i in range(len(self.eval_dataset)):
@@ -40,17 +41,17 @@ class Benchmark:
 
             score = self._evaluate_question(relevant_documents, retrieved_documents)
             score_sum += score
-            click.echo(f"Question {i}: {question_text} \n Score: {score:.4f}")
-            click.echo(f"Relevant documents: {relevant_documents}")
-            click.echo(f"Retrieved documents: {retrieved_documents}")
+            self.logger.info(f"Question {i}: {question_text} \n Score: {score:.4f}")
+            self.logger.info(f"Relevant documents: {relevant_documents}")
+            self.logger.info(f"Retrieved documents: {retrieved_documents}")
         
         end_time = time.time()
         duration = end_time - start_time
         
         average_score = score_sum / len(self.eval_dataset) if len(self.eval_dataset) > 0 else 0.0
-        click.echo(f"\nAverage score for benchmark '{self.collection_name}': {average_score:.4f}")
-        click.echo(f"Benchmark completed in {duration:.2f} seconds ({duration/60:.2f} minutes)")
-        click.echo(50*"-")
+        self.logger.info(f"\nAverage score for benchmark '{self.collection_name}': {average_score:.4f}")
+        self.logger.info(f"Benchmark completed in {duration:.2f} seconds ({duration/60:.2f} minutes)")
+        self.logger.info(50*"-")
 
         return {
             'average_score': average_score,

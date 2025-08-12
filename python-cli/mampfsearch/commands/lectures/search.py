@@ -3,6 +3,9 @@ import urllib3
 from mampfsearch.utils import config
 from mampfsearch.utils import helpers
 from mampfsearch import retrievers
+import logging
+
+logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings()
 
@@ -49,9 +52,9 @@ def search_lectures_command(query, limit, retriever, reranking):
 
     responses = search_lectures(query, config.LECTURE_COLLECTION_NAME, limit, retriever, reranking)
     for response in responses:
-        click.echo(f"Score: {response.score}")
-        click.echo(f"Text: {response.text}")
-        click.echo(f"Lecture: {response.lecture} ({response.start_time} - {response.end_time})")
-        click.echo(f"Lecture position: {response.lecture_position}")
-        click.echo(f"Position: {response.position}")
-        click.echo("-" * 50)
+        logger.info(f"Score: {response.score}")
+        logger.info(f"Text: {response.text}")
+        logger.info(f"Lecture: {response.lecture} ({response.start_time} - {response.end_time})")
+        logger.info(f"Lecture position: {response.lecture_position}")
+        logger.info(f"Position: {response.position}")
+        logger.info("-" * 50)

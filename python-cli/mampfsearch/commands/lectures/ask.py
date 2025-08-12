@@ -2,6 +2,9 @@ import click
 from .search import search_lectures
 from mampfsearch.utils.prompts import QA_PROMPT, RAG_PROMPT_JSON
 from mampfsearch.utils import config
+import logging
+
+logger = logging.getLogger(__name__)
 
 @click.command(name="ask")
 @click.argument("question", required=True)
@@ -18,7 +21,7 @@ def ask(question, retriever):
 
     response = search_lectures(term=question, collection=config.LECTURE_COLLECTION_NAME, limit=5, retriever_type=retriever, expand_first_answer=True)
     if len(response) == 0:
-        click.echo("No results found.")
+        logger.info("No results found.")
         return
 
     contexts = [hit.text for hit in response]
@@ -26,9 +29,9 @@ def ask(question, retriever):
 
     prompt = RAG_PROMPT_JSON.format(question=question, context=context_str)
 
-    click.echo(prompt)
+    logger.info(prompt)
     ollama_client.pull("gemma3n:e4b")
     answer = ollama_client.generate(model="gemma3n:e4b", prompt=prompt, options={"temperature": 0.5}).response
-    click.echo("Answer:")
-    click.echo(answer)
+    logger.info("Answer:")
+    logger.info(answer)
 

@@ -3,6 +3,10 @@ import click
 from pathlib import Path
 import subprocess
 import os
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 @click.command("transcribe")
 @click.argument(
@@ -32,8 +36,8 @@ def transcribe_lecture(audio_filename: str, model: str):
     host_audio_file_path = host_audio_dir / audio_filename
 
     if not host_audio_file_path.exists():
-        click.echo(f"Error: Audio file not found at '{host_audio_file_path}'.", err=True)
-        click.echo(f"Please ensure '{audio_filename}' exists in '{host_audio_dir}'.")
+        logger.error(f"Error: Audio file not found at '{host_audio_file_path}'.")
+        logger.error(f"Please ensure '{audio_filename}' exists in '{host_audio_dir}'.")
         raise click.Abort()
 
     # Ensure the host transcripts directory exists
@@ -46,12 +50,12 @@ def transcribe_lecture(audio_filename: str, model: str):
     srt_filename_stem = Path(audio_filename).stem
     expected_srt_host_path = host_transcripts_dir / (srt_filename_stem + ".srt")
 
-    click.echo(f"Host Docker volume base: '{host_data_dir}'")
-    click.echo(f"Host audio file: '{host_audio_file_path}'")
-    click.echo(f"Host transcripts output directory: '{host_transcripts_dir}'")
-    click.echo(f"Container audio file: '{container_audio_file_path}'")
-    click.echo(f"Container transcripts output directory: '{container_transcripts_dir}'")
-    click.echo(f"Using Whisper model: '{model}'")
+    logger.info(f"Host Docker volume base: '{host_data_dir}'")
+    logger.info(f"Host audio file: '{host_audio_file_path}'")
+    logger.info(f"Host transcripts output directory: '{host_transcripts_dir}'")
+    logger.info(f"Container audio file: '{container_audio_file_path}'")
+    logger.info(f"Container transcripts output directory: '{container_transcripts_dir}'")
+    logger.info(f"Using Whisper model: '{model}'")
 
     docker_command = [
         "docker", "exec",
@@ -64,26 +68,26 @@ def transcribe_lecture(audio_filename: str, model: str):
         "--output_dir", str(container_transcripts_dir),
     ]
 
-    click.echo(f"\nExecuting Docker command: {' '.join(docker_command)}\n")
+    logger.info(f"\nExecuting Docker command: {' '.join(docker_command)}\n")
 
     try:
         process = subprocess.Popen(docker_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         if process.stdout:
             for line in iter(process.stdout.readline, ''):
-                click.echo(line, nl=False)
+                logger.info(line, nl=False)
         process.wait()
 
         if process.returncode == 0:
             if expected_srt_host_path.exists():
-                click.echo(f"\nTranscription successful! SRT file saved to: {expected_srt_host_path}")
+                logger.info(f"\nTranscription successful! SRT file saved to: {expected_srt_host_path}")
             else:
-                click.echo(f"\nTranscription command completed, but expected SRT file not found at '{expected_srt_host_path}'.", err=True)
+                logger.warning(f"\nTranscription command completed, but expected SRT file not found at '{expected_srt_host_path}'.", err=True)
         else:
-            click.echo(f"\nError during transcription. Docker command exited with code {process.returncode}.", err=True)
+            logger.error(f"\nError during transcription. Docker command exited with code {process.returncode}.", err=True)
 
     except FileNotFoundError:
-        click.echo("Error: 'docker' command not found. Is Docker installed and in your PATH?", err=True)
+        logger.error("Error: 'docker' command not found. Is Docker installed and in your PATH?", err=True)
         raise click.Abort()
     except Exception as e:
-        click.echo(f"An unexpected error occurred: {e}", err=True)
+        logger.error(f"An unexpected error occurred: {e}", err=True)
         raise click.Abort()

@@ -1,18 +1,21 @@
 import click
 from mampfsearch.utils import config
+import logging
+
+logger = logging.getLogger(__name__)
 
 @click.command("init")
 def init():
     """Initialize the collection for lectures"""
     create_lectures_collection()
-    click.echo("Collection initialized")
+    logger.info("Collection initialized")
 
 def create_lectures_collection(name=config.LECTURE_COLLECTION_NAME):
     from qdrant_client import models
     client = config.get_qdrant_client()
 
     if client.collection_exists(name):
-        click.echo(f"Collection {name} already exists")
+        logger.info(f"Collection {name} already exists")
         return -1
     
     dimension=config.EMBEDDING_DIMENSION
@@ -40,5 +43,5 @@ def create_lectures_collection(name=config.LECTURE_COLLECTION_NAME):
         }
     )
     
-    click.echo(f"Created collection {name} (vector dimension={dimension})")
+    logger.info(f"Created collection {name} (vector dimension={dimension})")
     return 0
