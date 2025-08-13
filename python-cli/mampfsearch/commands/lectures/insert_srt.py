@@ -4,11 +4,6 @@ import pysrt
 from tqdm import tqdm
 from pathlib import Path
 
-def insert_srt_command(lecture_name, lecture_position, srt_file, collection_name=config.LECTURE_COLLECTION_NAME):
-    """Insert an SRT file into the lectures collection."""
-    insert_srt(lecture_name, lecture_position, srt_file, collection_name)
-
-
 def insert_srt(lecture_name, lecture_position, srt_file, collection_name=config.LECTURE_COLLECTION_NAME):
 
     subs = pysrt.open(srt_file)
