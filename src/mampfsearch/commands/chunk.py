@@ -1,17 +1,46 @@
+from copy import copy
+from typing import List
+from mampfsearch.utils.models import Chunk
 import re
 import srt
-from copy import copy
 import logging
 
 logger = logging.getLogger(__name__)
 
-def chunk_srt_command(srt_file, min_chunk_size, output, overlap):
-    """Optimizes chunk size of SRT files for better semantic search results"""
-    result = chunk_srt(srt_file, min_chunk_size, output, overlap)
-    if result == -1:
-        logger.info("Error processing SRT file", err=True)
-    else:
-        logger.info(f"Successfully chunked SRT to {output}")
+
+def chunk_srt(
+    srt_file: str,
+    lecture_name: str,
+    lecture_position: int,
+    min_chunk_size: int,
+    overlap: bool,
+    max_chunk_size: int = 750,
+) -> List[Chunk]:
+    """
+    Chunk an SRT file and return a list of Chunk models (no file I/O).
+    """
+    subs = list(get_srt(srt_file))
+
+    # 1) split into sentence-level subtitles
+    sentence_subs: List[srt.Subtitle] = []
+    for sub in subs:
+        sentence_subs.extend(split_subtitle_at_periods(sub))
+
+    # 2) merge consecutive sentences into sentence-complete blocks
+    merged_sentences = merge_subtitles_by_sentence(sentence_subs)
+
+    # 3) grow blocks to min_chunk_size (optionally with overlap context)
+    grown = merge_subtitles_by_size(merged_sentences, min_chunk_size, overlap)
+
+    # 4) split overly large blocks
+    if max_chunk_size < min_chunk_size:
+        raise ValueError("max_chunk_size must be >= min_chunk_size")
+    final_subtitles = split_large_chunks(grown, max_chunk_size)
+
+    # 5) map to Chunk models
+    return subtitles_to_chunks(
+        final_subtitles, lecture_name=lecture_name, lecture_position=lecture_position
+    )
 
 def get_srt(file_path):
     if not file_path.endswith(".srt"):
@@ -20,36 +49,20 @@ def get_srt(file_path):
         content = file.read()
     return srt.parse(content)
 
-def chunk_srt(srt_file, min_chunk_size, output_file, overlap):
-    try: 
-        subs = list(get_srt(srt_file))
-    except (FileNotFoundError, ValueError) as e:
-        logger.info(e, err=True)
-        return -1
-    
-    # Split subtitles at periods
-    sentence_subs = []
-    for sub in subs:
-        sentences = split_subtitle_at_periods(sub)
-        [sentence_subs.append(s) for s in sentences]
-    
-    # Merge subtitles by sentences (each subtitle is a full sentence)
-    merged_senteces = merge_subtitles_by_sentence(sentence_subs)
-
-    # Merge sentences to reach min_chunk_size
-    merged_subtitles = merge_subtitles_by_size(merged_senteces, min_chunk_size, overlap)
-
-    # Split large chunks if they exceed max_chunk_size
-    max_chunk_size = 750
-    if max_chunk_size < min_chunk_size:
-        logger.info(f"Warning: max_chunk_size ({max_chunk_size}) is smaller than min_chunk_size ({min_chunk_size}).", err=True)
-        raise ValueError("max_chunk_size must be greater than or equal to min_chunk_size.")
-    final_subtitles = split_large_chunks(merged_subtitles, max_chunk_size)
-
-    final_srt = srt.compose(final_subtitles, reindex=True)
-    with open(output_file, "w", encoding="utf-8") as file:
-        file.write(final_srt)
-    return 0
+def subtitles_to_chunks(final_subtitles: List[srt.Subtitle], lecture_name: str, lecture_position: int) -> List[Chunk]:
+    chunks: List[Chunk] = []
+    for i, sub in enumerate(final_subtitles):
+        chunks.append(
+            Chunk(
+                text=sub.content.strip(),
+                lecture_name=lecture_name,
+                lecture_position=lecture_position,
+                position=i,
+                start_time=sub.start,
+                end_time=sub.end,
+            )
+        )
+    return chunks
 
 def merge_subtitles_by_sentence(subtitles):
     merged_subtitles = []
@@ -105,7 +118,7 @@ def split_subtitle_at_periods(subtitle):
 
     subtitles = []
     # calculate estimated start and end time
-    # not optimal but get merged anyways later
+    # not optimal but chunks get merged anyways later
     for index, sentence in enumerate(sentences):
         if index == 0:
             start_time = subtitle.start
