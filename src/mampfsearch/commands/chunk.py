@@ -14,10 +14,11 @@ def chunk_srt(
     lecture_position: int,
     min_chunk_size: int,
     overlap: bool,
+    output_file: str = None,
     max_chunk_size: int = 750,
 ) -> List[Chunk]:
     """
-    Chunk an SRT file and return a list of Chunk models (no file I/O).
+    Chunk an SRT file and return a list of Chunk models.
     """
     subs = list(get_srt(srt_file))
 
@@ -36,6 +37,12 @@ def chunk_srt(
     if max_chunk_size < min_chunk_size:
         raise ValueError("max_chunk_size must be >= min_chunk_size")
     final_subtitles = split_large_chunks(grown, max_chunk_size)
+
+    # Optionally save the final subtitles to an SRT file for inspection
+    if output_file:
+       final_srt = srt.compose(final_subtitles, reindex=True)
+       with open(output_file, "w", encoding="utf-8") as file:
+            file.write(final_srt) 
 
     # 5) map to Chunk models
     return subtitles_to_chunks(
