@@ -10,6 +10,7 @@ setup(
         "pysrt",
         "FlagEmbedding",
         "rerankers",
+        "fastapi[standard]",
     ],
     entry_points={
         "console_scripts": [
