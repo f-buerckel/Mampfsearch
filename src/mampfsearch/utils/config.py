@@ -11,13 +11,10 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
 
 
-_bge_embedding_model = None
-def get_bge_embedding_model():
-    global _bge_embedding_model
-    if _bge_embedding_model is None:
-        from FlagEmbedding import BGEM3FlagModel
-        _bge_embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
-    return _bge_embedding_model
+def get_embedding_model():
+    from FlagEmbedding import BGEM3FlagModel
+    embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
+    return embedding_model
 
 LECTURE_COLLECTION_NAME = "Lectures"
 
