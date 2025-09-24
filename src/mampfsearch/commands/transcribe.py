@@ -6,7 +6,7 @@ import os
 import logging
 
 
-logger = logging.getLogger(__name__)
+logger = config.logger
 
 def transcribe_lecture(audio_filename: str, model: str):
     """

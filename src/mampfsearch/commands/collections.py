@@ -1,7 +1,7 @@
 from mampfsearch.utils.config import get_qdrant_client
 import logging
+from mampfsearch.utils.config import logger
 
-logger = logging.getLogger(__name__)
 
 def delete(name):
     client = get_qdrant_client()

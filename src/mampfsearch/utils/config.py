@@ -43,3 +43,14 @@ def get_lectures_path():
 
 def get_benchmark_path():
     return get_root_path() / "benchmarks"
+
+logging.basicConfig(
+  logging  level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('../mampfsearch.log'),
+        logging.StreamHandler() 
+    ]
+)
+
+logger = .getLogger(__name__)
