@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
+from mampfsearch.utils.models import RetrievalItem
 from .RetrievalPoint import RetrievalPoint
 
 class BaseRetriever(ABC):

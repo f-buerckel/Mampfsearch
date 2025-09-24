@@ -1,4 +1,5 @@
 from pathlib import Path 
+import logging
 import atexit
 
 QDRANT_HOST = "localhost"
@@ -10,29 +11,41 @@ OLLAMA_HOST = "http://localhost:11434"
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
 
-
-def get_embedding_model():
-    from FlagEmbedding import BGEM3FlagModel
-    embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
-    return embedding_model
-
 LECTURE_COLLECTION_NAME = "Lectures"
 
 PREFETCH_LIMIT = 50
 
-def get_qdrant_client():
-    from qdrant_client import QdrantClient
-    """Return configured qdrant client"""
-    return QdrantClient(
-        host=QDRANT_HOST,
-        port=QDRANT_PORT
-    )
 
+_embedding_model = None
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        from FlagEmbedding import BGEM3FlagModel
+        _embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
+    return _embedding_model
+
+
+_qdrant_client = None
+def get_qdrant_client():
+    global _qdrant_client
+    if _qdrant_client is None:
+        from qdrant_client import QdrantClient
+        _qdrant_client = QdrantClient(
+            host=QDRANT_HOST,
+            port=QDRANT_PORT
+        )
+
+    return _qdrant_client
+
+
+_ollama_client = None
 def get_ollama_client():
-    from ollama import Client
-    """Return configured ollama client"""
-    ollama_client = Client(host = OLLAMA_HOST)
-    return ollama_client
+    global _ollama_client
+    if _ollama_client is None:
+        from ollama import Client
+        _ollama_client = Client(host = OLLAMA_HOST)
+
+    return _ollama_client
 
 #Paths
 def get_root_path():
