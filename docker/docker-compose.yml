@@ -16,28 +16,46 @@ services:
     networks:
       - qdrant-net
 
-  whisper:
-    build:
-      context: ./whisper
-    image: whisper-app
-    container_name: whisper-container
+#  whisper:
+#    build:
+#      context: ./whisper
+#    image: whisper-app
+#    container_name: whisper-container
+#    volumes:
+#      - ./lectures:/data
+#      - ./whisper/models:/root/.cache/whisper
+#    networks:
+#      - qdrant-net
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    ipc: host
+
+    command: --model openai/gpt-oss-20b --max-model-len 4096 --gpu-memory-utilization 0.9
+    ports:
+      - "8000:8000"
     volumes:
-      - ./lectures:/data
-      - ./whisper/models:/root/.cache/whisper
+      - /root/.cache/huggingface:/root/.cache/huggingface
+      - /root/.cache/vllm:/root/.cache/vllm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
     networks:
       - qdrant-net
     
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama:/root/.ollama
-    networks:
-      - qdrant-net
+#  ollama:
+#    image: ollama/ollama:latest
+#    container_name: ollama
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - ollama:/root/.ollama
+#    networks:
+#      - qdrant-net
+#
 volumes:
-  ollama:
   qdrant_data:
 
 networks:
