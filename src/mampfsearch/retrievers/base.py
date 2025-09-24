@@ -8,7 +8,7 @@ class BaseRetriever(ABC):
     """
 
     @abstractmethod
-    def retrieve(self, query: str, collection_name: str, limit: int = 10) -> List[RetrievalPoint]:
+    def retrieve(self, query: str, collection_name: str, limit: int = 10) -> List[RetrievalItem]:
         """
         Retrieve a list of RetrievalPoints based on the query.
 

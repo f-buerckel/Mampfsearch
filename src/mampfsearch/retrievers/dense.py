@@ -21,4 +21,4 @@ class DenseRetriever(BaseRetriever):
             with_payload=True
         )
         
-        return [RetrievalPoint.from_qdrant_point(point) for point in points.points]
+        return [RetrievalItem.from_qdrant_point(point) for point in points.points]
