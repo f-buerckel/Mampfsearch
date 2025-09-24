@@ -11,6 +11,9 @@ setup(
         "FlagEmbedding",
         "rerankers",
         "fastapi[standard]",
+        "ollama",
+        "qdrant_client",
+        "FlagEmbedding",
     ],
     entry_points={
         "console_scripts": [
