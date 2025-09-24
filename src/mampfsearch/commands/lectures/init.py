@@ -14,7 +14,7 @@ def create_lectures_collection(name=config.LECTURE_COLLECTION_NAME):
 
     if client.collection_exists(name):
         logger.info(f"Collection {name} already exists")
-        return -1
+        raise ValueError(f"Collection '{name}' already exists")
     
     dimension=config.EMBEDDING_DIMENSION
     client.create_collection(
