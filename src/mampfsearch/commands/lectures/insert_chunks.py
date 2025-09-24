@@ -6,8 +6,8 @@ from qdrant_client.models import PointStruct
 
 def insert_chunks(
         chunks : List[Chunk],
-        collection_name=config.LECTURE_COLLECTION_NAME
-        ):
+        collection_name=config.LECTURE_COLLECTION_NAME,
+    ):
 
     vectors, payloads = create_embeddings_and_payloads(chunks)
     upload(vectors, payloads, collection_name)
@@ -15,10 +15,10 @@ def insert_chunks(
     return 
 
 def create_embeddings_and_payloads(chunks):
-    model = config.get_bge_embedding_model()
-
     payloads = []
     vectors = []
+
+    model = config.get_embedding_model()
 
     for chunk in chunks:
         payload = {
@@ -39,12 +39,13 @@ def create_embeddings_and_payloads(chunks):
         vectors.append(embedding)
 
     return vectors, payloads
-    
+
 def upload(vectors, payloads, collection_name):
-    client = config.get_qdrant_client()
+
+    qdrant_client = config.get_qdrant_client()
 
     for i, embedding in enumerate(vectors):
-        client.upsert(
+        qdrant_client.upsert(
             collection_name=collection_name,
             points = [
                 PointStruct(
