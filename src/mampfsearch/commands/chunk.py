@@ -1,11 +1,12 @@
 from copy import copy
 from typing import List
 from mampfsearch.utils.models import Chunk
+from mampfsearch.utils.config import logger
 import re
 import srt
 import logging
+from pathlib import Path
 
-logger = logging.getLogger(__name__)
 
 
 def chunk_srt(
@@ -50,7 +51,7 @@ def chunk_srt(
     )
 
 def get_srt(file_path):
-    if not file_path.endswith(".srt"):
+    if Path(file_path).suffix != ".srt":
         raise ValueError(f"The file {file_path} is not a valid SRT file.")
     with open(file_path, "r", encoding="utf-8") as file:
         content = file.read()
