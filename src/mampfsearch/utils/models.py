@@ -60,12 +60,16 @@ class RetrievalItem(BaseModel):
             position=int(point.payload["position"]),
         )
 
+
+class Response(BaseModel):
+    answer: str
+    confidence_score: float
+    source_snippets: Dict[str, float]
+
 class AskRequest(BaseModel):
     question: str
-    retriever_type: str = "hybrid"
+    retriever_type: RetrieverTypeEnum = RetrieverTypeEnum.hybrid
     limit: int = 5
-    model: str = "gemma3n:e4b"
-    temperature: float = 0.5
     collection_name: str = "Lectures"
 
 class SearchResult(BaseModel):
