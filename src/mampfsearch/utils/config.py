@@ -58,7 +58,7 @@ def get_benchmark_path():
     return get_root_path() / "benchmarks"
 
 logging.basicConfig(
-  logging  level=logging.INFO,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('../mampfsearch.log'),
@@ -66,4 +66,4 @@ logging.basicConfig(
     ]
 )
 
-logger = .getLogger(__name__)
+logger = logging.getLogger(__name__)
