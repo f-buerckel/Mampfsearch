@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     embedding_model = config.get_embedding_model()
     qdrant_client = config.get_qdrant_client()
-    ollama_client = config.get_ollama_client()
+    ollama_client = config.get_llm_client()
     yield
 
 app = FastAPI(
