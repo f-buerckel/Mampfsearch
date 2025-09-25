@@ -31,7 +31,7 @@ services:
     image: vllm/vllm-openai:latest
     ipc: host
 
-    command: --model openai/gpt-oss-20b --max-model-len 4096 --gpu-memory-utilization 0.9
+    command: --model openai/gpt-oss-20b --max-model-len 4096 --gpu-memory-utilization 0.8
     ports:
       - "8000:8000"
     volumes:
