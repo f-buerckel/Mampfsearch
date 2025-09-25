@@ -21,7 +21,6 @@ async def ask(question: str,
 
     response = search_lectures(
         query=question,
-        collection_name=config.LECTURE_COLLECTION_NAME,
         limit=limit,
         retriever_type=retriever,
         reranking=False
