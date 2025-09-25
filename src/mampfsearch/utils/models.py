@@ -19,7 +19,6 @@ class IngestRequest(BaseModel):
     srt_file : Path
     lecture_name: str
     lecture_position: int = 0
-    collection_name: str = "Lectures"
     min_chunk_size: int = 350
     max_chunk_size: int = 850
     overlap: bool = True
@@ -34,7 +33,6 @@ class SearchRequest(BaseModel):
     retriever_type: RetrieverTypeEnum = RetrieverTypeEnum.hybrid  # dense | hybrid | hybrid+colbert
     limit: int = 5
     reranking: bool = False
-    collection_name: str = "Lectures"
 
 class RetrievalItem(BaseModel):
     score: float
@@ -67,7 +65,6 @@ class AskRequest(BaseModel):
     question: str
     retriever_type: RetrieverTypeEnum = RetrieverTypeEnum.hybrid
     limit: int = 5
-    collection_name: str = "Lectures"
 
 class SearchResult(BaseModel):
     items: List[RetrievalItem]

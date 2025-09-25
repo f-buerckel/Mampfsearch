@@ -4,6 +4,7 @@ from mampfsearch.core.chunk import chunk_srt
 from mampfsearch.core.lectures.insert_chunks import insert_chunks
 from mampfsearch.core.transcribe import transcribe_lecture
 from mampfsearch.utils.models import IngestRequest, TranscriptionRequest
+from mampfsearch.utils import config
 
 router = APIRouter(
     tags=["Ingest"],
@@ -29,10 +30,10 @@ async def ingest_transcript(
 
     insert_chunks(
         chunks=chunks,
-        collection_name=request.collection_name,
+        collection_name=config.LECTURE_COLLECTION_NAME,
     ) 
 
-    logger.info(f"Inserted {len(chunks)} chunks for lecture {request.lecture_name} into collection {request.collection_name}")
+    logger.info(f"Inserted {len(chunks)} chunks for lecture {request.lecture_name} into collection {config.LECTURE_COLLECTION_NAME}")
 
 @router.post("/transcribe")
 async def transcribe_lecture_endpoint(
