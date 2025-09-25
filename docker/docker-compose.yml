@@ -33,7 +33,7 @@ services:
 
     command: --model openai/gpt-oss-20b --max-model-len 4096 --gpu-memory-utilization 0.8
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - /root/.cache/huggingface:/root/.cache/huggingface
       - /root/.cache/vllm:/root/.cache/vllm
