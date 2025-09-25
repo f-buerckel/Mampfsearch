@@ -1,24 +1,27 @@
-from .search import search_lectures
+import logging
+import json
+
+from openai import AsyncOpenAI
+
+from mampfsearch.core.lectures.search import search_lectures
+
 from mampfsearch.utils.prompts import QA_PROMPT, RAG_PROMPT_JSON
 from mampfsearch.utils.models import Response, RetrieverTypeEnum
 from mampfsearch.utils import config
-import logging
-import json
-from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 async def ask(question: str,
               retriever: RetrieverTypeEnum = RetrieverTypeEnum.hybrid,
               limit: int = 5,
-              collection_name: str = config.LECTURE_COLLECTION_NAME) -> Response:
+              ) -> Response:
     """Ask a question and get the answer from the lectures"""
 
-    client = AsyncOpenAI(base_url="http://localhost:8001/v1", api_key="dummy")
+    client = config.get_llm_client()
 
     response = search_lectures(
         query=question,
-        collection_name=collection_name,
+        collection_name=config.LECTURE_COLLECTION_NAME,
         limit=limit,
         retriever_type=retriever,
         reranking=False

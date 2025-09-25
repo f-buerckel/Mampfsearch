@@ -1,10 +1,11 @@
+import logging
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from mampfsearch.utils import config
 from mampfsearch.routes import maintenance, ingest, lectures
-import logging
 
-logger = config.logger
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

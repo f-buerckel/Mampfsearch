@@ -1,8 +1,10 @@
 import urllib3
+import logging
+
+from rerankers import Reranker
+
 from mampfsearch.utils import config, helpers, models
 from mampfsearch import retrievers
-from rerankers import Reranker
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +12,6 @@ urllib3.disable_warnings()
 
 def search_lectures(
         query: str,
-        collection_name: str,
         limit: int,
         retriever_type: models.RetrieverTypeEnum,
         reranking: bool =False
@@ -32,15 +33,20 @@ def search_lectures(
         reranker = Reranker('BAAI/bge-reranker-v2-m3', verbose=False)
         retriever = retrievers.RerankerRetriever(base_retriever=retriever, reranker=reranker)
 
-    responses = retriever.retrieve(query, collection_name, limit)
+    responses = retriever.retrieve(query, config.LECTURE_COLLECTION_NAME, limit)
 
     return responses
 
-def search_lectures_command(query, limit, retriever, reranking):
+def search_lectures_command(
+        query : str,
+        limit : int,
+        retriever : models.RetrieverTypeEnum,
+        reranking : bool,
+    ):
 
     """Retrieve relevant lecture parts for a given query"""
 
-    responses = search_lectures(query, config.LECTURE_COLLECTION_NAME, limit, retriever, reranking)
+    responses = search_lectures(query, limit, retriever, reranking)
     for response in responses:
         logger.info(f"Score: {response.score}")
         logger.info(f"Text: {response.text}")

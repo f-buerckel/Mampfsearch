@@ -1,8 +1,9 @@
 import logging
-from fastapi import APIRouter
-from mampfsearch.commands.chunk import chunk_srt
-from mampfsearch.commands.lectures.insert_chunks import insert_chunks
-from mampfsearch.utils.models import IngestRequest, Chunk
+from fastapi import APIRouter, BackgroundTasks
+from mampfsearch.core.chunk import chunk_srt
+from mampfsearch.core.lectures.insert_chunks import insert_chunks
+from mampfsearch.core.transcribe import transcribe_lecture
+from mampfsearch.utils.models import IngestRequest, TranscriptionRequest
 
 router = APIRouter(
     tags=["Ingest"],
@@ -32,3 +33,12 @@ async def ingest_transcript(
     ) 
 
     logger.info(f"Inserted {len(chunks)} chunks for lecture {request.lecture_name} into collection {request.collection_name}")
+
+@router.post("/transcribe")
+async def transcribe_lecture_endpoint(
+    request: TranscriptionRequest,
+    background_task: BackgroundTasks
+):
+
+    background_task.add_task(transcribe_lecture, audio_file=request.audio_file)
+    return {"message": "Transcription started in background"}

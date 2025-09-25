@@ -1,12 +1,11 @@
 from pathlib import Path 
 import logging
-import atexit
 
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-OLLAMA_HOST = "http://localhost:11434"
 
-
+VLLM_HOST = "localhost"
+VLLM_PORT = 8001
 
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
@@ -38,24 +37,14 @@ def get_qdrant_client():
     return _qdrant_client
 
 
-_ollama_client = None
-def get_ollama_client():
-    global _ollama_client
-    if _ollama_client is None:
-        from ollama import Client
-        _ollama_client = Client(host = OLLAMA_HOST)
+_llm_client = None
+def get_llm_client():
+    global _llm_client
+    if _llm_client is None:
+        from openai import AsyncOpenAI
+        _llm_client = AsyncOpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
 
-    return _ollama_client
-
-#Paths
-def get_root_path():
-    return Path(__file__).parent.parent.parent.parent
-
-def get_lectures_path():
-    return get_root_path() / "docker" / "lectures"
-
-def get_benchmark_path():
-    return get_root_path() / "benchmarks"
+    return _llm_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,5 +54,3 @@ logging.basicConfig(
         logging.StreamHandler() 
     ]
 )
-
-logger = logging.getLogger(__name__)

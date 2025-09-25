@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException
-from mampfsearch.commands.lectures.init import init, create_lectures_collection
+from mampfsearch.core.lectures.init import init, create_lectures_collection
 from mampfsearch.utils import config
 
 router = APIRouter(

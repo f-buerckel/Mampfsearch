@@ -13,10 +13,7 @@ class Chunk(BaseModel):
     end_time: Optional[timedelta] = None
 
 class TranscriptionRequest(BaseModel):
-    lecture_name: str
-    lecture_position: int = 0
-    audio_filename: str
-    whisper_model: str = "base"
+    audio_file: Path
 
 class IngestRequest(BaseModel):
     srt_file : Path

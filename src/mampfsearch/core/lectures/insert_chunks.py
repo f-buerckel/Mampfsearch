@@ -1,20 +1,27 @@
-from mampfsearch.utils import config
-from mampfsearch.utils.models import Chunk
-from mampfsearch.utils import helpers
+import logging
+
 from typing import List
 from qdrant_client.models import PointStruct
 
+from mampfsearch.utils import config
+from mampfsearch.utils.models import Chunk
+from mampfsearch.utils import helpers
+
+logger = logging.getLogger(__name__)
+
 def insert_chunks(
         chunks : List[Chunk],
-        collection_name=config.LECTURE_COLLECTION_NAME,
     ):
 
     vectors, payloads = create_embeddings_and_payloads(chunks)
-    upload(vectors, payloads, collection_name)
+    upload(vectors, payloads, config.LECTURE_COLLECTION_NAME)
 
     return 
 
-def create_embeddings_and_payloads(chunks):
+def create_embeddings_and_payloads(
+        chunks : List[Chunk]
+    ):
+
     payloads = []
     vectors = []
 
@@ -40,7 +47,11 @@ def create_embeddings_and_payloads(chunks):
 
     return vectors, payloads
 
-def upload(vectors, payloads, collection_name):
+def upload(
+        vectors : List[dict],
+        payloads : List[dict],
+        collection_name : str,
+    ):
 
     qdrant_client = config.get_qdrant_client()
 
@@ -60,4 +71,4 @@ def upload(vectors, payloads, collection_name):
             ]
         )
 
-    print(f"Inserted {len(vectors)} vectors into collection {collection_name}")
+    logger.info(f"Inserted {len(vectors)} vectors into collection {collection_name}")

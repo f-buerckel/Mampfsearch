@@ -1,13 +1,12 @@
-from copy import copy
-from typing import List
-from mampfsearch.utils.models import Chunk
-from mampfsearch.utils.config import logger
 import re
 import srt
 import logging
+
+from copy import copy
+from typing import List
 from pathlib import Path
 
-
+from mampfsearch.utils.models import Chunk
 
 def chunk_srt(
     srt_file: str,

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from mampfsearch.commands.lectures.search import search_lectures
-from mampfsearch.commands.lectures.ask import ask
+from mampfsearch.core.lectures.search import search_lectures
+from mampfsearch.core.lectures.ask import ask
 from mampfsearch.utils import config, models
 
 router = APIRouter(
@@ -15,7 +15,6 @@ async def search_lectures_endpoint(
 
     retrieval_items = search_lectures(
         query=request.query,
-        collection_name=request.collection_name,
         limit=request.limit,
         retriever_type=request.retriever_type,
         reranking=request.reranking,
@@ -32,7 +31,6 @@ async def ask_lectures_endpoint(
         question=request.question,
         retriever=request.retriever_type,
         limit=request.limit,
-        collection_name=request.collection_name,
     )
 
     return response

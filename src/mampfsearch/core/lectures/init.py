@@ -1,5 +1,6 @@
-from mampfsearch.utils import config
 import logging
+
+from mampfsearch.utils import config
 
 logger = logging.getLogger(__name__)
 
@@ -8,9 +9,11 @@ def init():
     create_lectures_collection()
     logger.info("Collection initialized")
 
-def create_lectures_collection(name=config.LECTURE_COLLECTION_NAME):
+def create_lectures_collection():
     from qdrant_client import models
     client = config.get_qdrant_client()
+
+    name = config.LECTURE_COLLECTION_NAME
 
     if client.collection_exists(name):
         logger.info(f"Collection {name} already exists")
