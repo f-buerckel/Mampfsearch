@@ -30,10 +30,7 @@ async def ingest_transcript(
 
     insert_chunks(
         chunks=chunks,
-        collection_name=config.LECTURE_COLLECTION_NAME,
     ) 
-
-    logger.info(f"Inserted {len(chunks)} chunks for lecture {request.lecture_name} into collection {config.LECTURE_COLLECTION_NAME}")
 
 @router.post("/transcribe")
 async def transcribe_lecture_endpoint(
