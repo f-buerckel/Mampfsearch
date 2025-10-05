@@ -30,8 +30,12 @@ services:
   vllm:
     image: vllm/vllm-openai:latest
     ipc: host
+    environment: 
+      - VLLM_LOGGING_LEVEL=INFO
+      - VLLM_DEBUG_LOG_API_SERVER_RESPONSE=TRUE
 
     command: --model openai/gpt-oss-20b --max-model-len 50000 --gpu-memory-utilization 0.7
+      # command: --model leon-se/gemma-3-27b-it-qat-W4A16-G128 --max-model-len 4096 --max-num-seqs 1 --gpu-memory-utilization 0.75
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
