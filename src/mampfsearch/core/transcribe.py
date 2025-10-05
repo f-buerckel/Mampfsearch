@@ -40,11 +40,18 @@ def transcribe_lecture(
     )
 
     output_srt_file = audio_file.with_suffix('.srt')
-    logger.info(f"Transcription will be saved to: {output_srt_file}")
+    output_txt_file = audio_file.with_suffix('.txt')
+    logger.info(f"Transcription srt will be saved to: {output_srt_file}")
+    logger.info(f"Transcription text will be saved to: {output_txt_file}")
 
     logger.info(f"Starting transcription for {audio_file}...")
     result = pipe(str(audio_file), return_timestamps=True)
     logger.info("Transcription complete.")
+
+    # save as plain text
+    with open(output_txt_file, "w", encoding="utf-8") as f:
+        f.write(result["text"])
+    logger.info(f"Successfully created text file at {output_txt_file}")
 
     to_srt(result["chunks"], output_srt_file)
     logger.info(f"Successfully created SRT file at {output_srt_file}")
