@@ -1,0 +1,76 @@
+[
+  {
+    "text": "LDA is a linear classifier using Gaussian assumptions.",
+    "spans": [
+      { "text": "LDA", "is_entity": true, "label": "ALGORITHM", "reason": "named algorithm" },
+      { "text": "linear classifier", "is_entity": true, "label": "CONCEPT", "reason": "model concept" },
+      { "text": "Gaussian", "is_entity": true, "label": "DISTRIBUTION", "reason": "named distribution" }
+    ]
+  },
+  {
+    "text": "We apply Bayes' rule and the chain rule to derive the posterior probability.",
+    "spans": [
+      { "text": "Bayes' rule", "is_entity": true, "label": "THEOREM_RULE", "reason": "named rule" },
+      { "text": "chain rule", "is_entity": true, "label": "THEOREM_RULE", "reason": "named rule" },
+      { "text": "posterior probability", "is_entity": true, "label": "CONCEPT", "reason": "probabilistic concept" },
+      { "text": "derive", "is_entity": false, "label": "==NONE==", "reason": "generic verb" }
+    ]
+  },
+  {
+    "text": "The logistic sigmoid function and softmax function map inputs to probabilities.",
+    "spans": [
+      { "text": "logistic sigmoid function", "is_entity": true, "label": "FUNCTION", "reason": "named function" },
+      { "text": "softmax function", "is_entity": true, "label": "FUNCTION", "reason": "named function" },
+      { "text": "probabilities", "is_entity": true, "label": "CONCEPT", "reason": "mathematical concept" },
+      { "text": "inputs", "is_entity": false, "label": "==NONE==", "reason": "generic noun" }
+    ]
+  },
+  {
+    "text": "We compute argmax over class 1 and class minus 1 using sign of x beta.",
+    "spans": [
+      { "text": "argmax", "is_entity": true, "label": "OPERATOR", "reason": "named operator" },
+      { "text": "sign", "is_entity": true, "label": "OPERATOR", "reason": "named operator" },
+      { "text": "x", "is_entity": false, "label": "==NONE==", "reason": "variable excluded" },
+      { "text": "beta", "is_entity": false, "label": "==NONE==", "reason": "parameter excluded" }
+    ]
+  },
+  {
+    "text": "Neural networks use gradient descent with a learning rate to minimize cross-entropy loss during the backward pass.",
+    "spans": [
+      { "text": "Neural networks", "is_entity": true, "label": "ALGORITHM", "reason": "algorithm family" },
+      { "text": "gradient descent", "is_entity": true, "label": "ALGORITHM", "reason": "optimization algorithm" },
+      { "text": "learning rate", "is_entity": true, "label": "CONCEPT", "reason": "hyperparameter concept" },
+      { "text": "cross-entropy loss", "is_entity": true, "label": "FUNCTION", "reason": "named loss function" },
+      { "text": "backward pass", "is_entity": true, "label": "CONCEPT", "reason": "neural network phase" },
+      { "text": "minimize", "is_entity": false, "label": "==NONE==", "reason": "generic verb" }
+    ]
+  },
+  {
+    "text": "The covariance matrix determines the decision boundary between classes with equal priors.",
+    "spans": [
+      { "text": "covariance matrix", "is_entity": true, "label": "CONCEPT", "reason": "statistical concept" },
+      { "text": "decision boundary", "is_entity": true, "label": "CONCEPT", "reason": "model concept" },
+      { "text": "priors", "is_entity": true, "label": "CONCEPT", "reason": "probabilistic concept" },
+      { "text": "classes", "is_entity": false, "label": "==NONE==", "reason": "generic noun" }
+    ]
+  },
+  {
+    "text": "According to Theorem 2.17 and Theorem 9.7, we apply the Theorem von Bolzano-Weierstraß to the subsequence.",
+    "spans": [
+      { "text": "Theorem 2.17", "is_entity": false, "label": "==NONE==", "reason": "numbered reference, not a named theorem" },
+      { "text": "Theorem 9.7", "is_entity": false, "label": "==NONE==", "reason": "numbered reference, not a named theorem" },
+      { "text": "Theorem von Bolzano-Weierstraß", "is_entity": true, "label": "THEOREM_RULE", "reason": "named theorem with proper name" },
+      { "text": "subsequence", "is_entity": true, "label": "CONCEPT", "reason": "mathematical concept" }
+    ]
+  },
+  {
+    "text": "Let phi be a function where phi of k equals k squared for k in N.",
+    "spans": [
+      { "text": "phi", "is_entity": false, "label": "==NONE==", "reason": "locally defined function variable" },
+      { "text": "function", "is_entity": false, "label": "==NONE==", "reason": "generic term without specific identity" },
+      { "text": "k", "is_entity": false, "label": "==NONE==", "reason": "variable excluded" },
+      { "text": "N", "is_entity": false, "label": "==NONE==", "reason": "set symbol excluded" },
+      { "text": "squared", "is_entity": false, "label": "==NONE==", "reason": "generic operation" }
+    ]
+  }
+]

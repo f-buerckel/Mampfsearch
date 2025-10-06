@@ -1,10 +1,10 @@
 from .base import BaseRetriever
-from mampfsearch.utils.models import RetrievalItem
+from mampfsearch.utils.models import LectureRetrievalItem
 from typing import List
 from mampfsearch.utils import config, helpers
 
 class HybridRetriever(BaseRetriever):
-    def retrieve(self, query: str, collection_name: str, limit: int) -> List[RetrievalItem]:
+    def retrieve(self, query: str, collection_name: str, limit: int) -> List[LectureRetrievalItem]:
         from qdrant_client import models
         client = config.get_qdrant_client()
         model = config.get_embedding_model()
@@ -36,4 +36,4 @@ class HybridRetriever(BaseRetriever):
             with_payload=True
         )
         
-        return [RetrievalItem.from_qdrant_point(point) for point in points.points]
+        return [LectureRetrievalItem.from_qdrant_point(point) for point in points.points]

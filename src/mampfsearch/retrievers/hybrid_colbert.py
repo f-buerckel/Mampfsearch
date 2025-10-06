@@ -1,11 +1,11 @@
 from .base import BaseRetriever
 from typing import List
 from mampfsearch.utils import config, helpers
-from mampfsearch.utils.models import RetrievalItem
+from mampfsearch.utils.models import LectureRetrievalItem
 
 class HybridColbertRerankingRetriever(BaseRetriever):
         
-    def retrieve(self, query: str, collection_name: str, limit: int) -> List[RetrievalItem]:
+    def retrieve(self, query: str, collection_name: str, limit: int) -> List[LectureRetrievalItem]:
         from qdrant_client import models
 
         client = config.get_qdrant_client()
@@ -39,4 +39,4 @@ class HybridColbertRerankingRetriever(BaseRetriever):
             limit=limit,
         )
 
-        return [RetrievalItem.from_qdrant_point(point) for point in points.points]
+        return [LectureRetrievalItem.from_qdrant_point(point) for point in points.points]

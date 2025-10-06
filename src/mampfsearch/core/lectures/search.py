@@ -15,7 +15,7 @@ def search_lectures(
         limit: int,
         retriever_type: models.RetrieverTypeEnum,
         reranking: bool =False
-        ) -> list[models.RetrievalItem]:
+        ) -> list[models.LectureRetrievalItem]:
 
     """Search lectures with keyword or semantic search"""
 

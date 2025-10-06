@@ -1,6 +1,8 @@
+import logging
+
 from pydantic import BaseModel
 from enum import Enum
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from datetime import timedelta
 from pathlib import Path
 
@@ -34,7 +36,7 @@ class SearchRequest(BaseModel):
     limit: int = 5
     reranking: bool = False
 
-class RetrievalItem(BaseModel):
+class LectureRetrievalItem(BaseModel):
     score: float
     text: str
     lecture: str
@@ -55,6 +57,53 @@ class RetrievalItem(BaseModel):
             position=int(point.payload["position"]),
         )
 
+class VideoLocation(BaseModel):
+    courseId: str
+    fileId : str
+    lectureId: str
+    timestamp: str
+
+class FileLocation(BaseModel):
+    courseId: str
+    fileId : str
+
+class Entity(BaseModel):
+    id: str
+    label: str
+    FileLocations: Optional[List[FileLocation]] = None
+    VideoLocations: Optional[List[VideoLocation]] = None
+
+    @classmethod
+    def from_entity_candidate(cls, entity_candidate):
+        return cls(
+            id = entity_candidate.text.lower(),
+            label = entity_candidate.label,
+            FileLocations = [entity_candidate.Location] if isinstance(entity_candidate.Location, FileLocation) else [],
+            VideoLocations = [entity_candidate.Location] if isinstance(entity_candidate.Location, VideoLocation) else [],
+        )
+
+
+class EntityRetrievalItem(BaseModel):
+    score : float
+    entity : Entity
+
+    @classmethod
+    def from_qdrant_point(cls, point):
+        return cls(
+            score=float(point.score),
+            entity=Entity(**point.payload)
+        )
+
+
+class EntityCandidate(BaseModel):
+    """ 
+    Entity candidates are single extracted entities from a document that may or may not already be in the knowledge base. 
+    Entities are already in the knowledge base and contain a unique identifier along every occurrence of the entity across all documents.
+    """
+    text: str
+    label: str
+    Location: Union[VideoLocation, FileLocation, None] = None
+
 
 class Response(BaseModel):
     answer: str
@@ -67,9 +116,14 @@ class AskRequest(BaseModel):
     limit: int = 5
 
 class SearchResult(BaseModel):
-    items: List[RetrievalItem]
+    items: List[LectureRetrievalItem]
 
 class Answer(BaseModel):
     answer: str
     confidence_score: float
     source_snippets: Dict[str, float]
+
+class ExtractionInfo(BaseModel):
+    num_extracted_entities: int
+    num_new_inserted_entities: int
+    num_merged_entities: int

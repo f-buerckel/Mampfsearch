@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from mampfsearch.utils import config
-from mampfsearch.routes import maintenance, ingest, lectures
+from mampfsearch.routes import maintenance, ingest, lectures, graph
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ app = FastAPI(
 app.include_router(maintenance.router)
 app.include_router(ingest.router)
 app.include_router(lectures.router)
+app.include_router(graph.router)
 
 @app.get("/")
 async def root():

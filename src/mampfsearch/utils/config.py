@@ -11,8 +11,12 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
 
 LECTURE_COLLECTION_NAME = "Lectures"
+ENTITIES_COLLECTION_NAME = "Entities"
 
 PREFETCH_LIMIT = 50
+
+# If there is an entity embedding with cosine similarity above this threshold, we consider it the same entity.
+ENTITY_EMBED_SIM_THRESHOLD = 0.82
 
 
 _embedding_model = None
@@ -48,9 +52,21 @@ def get_llm_client():
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(module)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('../mampfsearch.log'),
         logging.StreamHandler() 
     ]
 )
+
+logging.getLogger(__name__).setLevel(logging.DEBUG)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("qdrant_client").setLevel(logging.INFO)
+logging.getLogger("spacy_llm").setLevel(logging.INFO)
+logging.getLogger("spacy").setLevel(logging.WARNING)
+logging.getLogger("docling").setLevel(logging.INFO)
+logging.getLogger("FlagEmbedding").setLevel(logging.WARNING)
+logging.getLogger("runner").setLevel(logging.WARNING)

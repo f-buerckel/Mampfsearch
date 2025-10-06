@@ -1,7 +1,7 @@
 from .base import BaseRetriever
 from typing import List
 from mampfsearch.utils import config
-from mampfsearch.utils.models import RetrievalItem
+from mampfsearch.utils.models import LectureRetrievalItem
 
 class RerankerRetriever(BaseRetriever):
     
@@ -15,7 +15,7 @@ class RerankerRetriever(BaseRetriever):
         self.base_retriever = base_retriever
         self.reranker = reranker
     
-    def retrieve(self, query: str, collection_name: str, limit: int) -> List[RetrievalItem]:
+    def retrieve(self, query: str, collection_name: str, limit: int) -> List[LectureRetrievalItem]:
         initial_points = self.base_retriever.retrieve(query, collection_name, config.PREFETCH_LIMIT)
 
         documents = [result.text for result in initial_points]
@@ -26,8 +26,8 @@ class RerankerRetriever(BaseRetriever):
             index = document.doc_id
             point = initial_points[index]
 
-            # Create a new RetrievalItem with the reranked score and the original point's attributes
-            new_point = RetrievalItem(
+            # Create a new LectureRetrievalItem with the reranked score and the original point's attributes
+            new_point = LectureRetrievalItem(
                 score=document.score,
                 text=point.text,
                 lecture=point.lecture,

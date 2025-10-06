@@ -11,7 +11,7 @@ router = APIRouter(
 @router.post("/search")
 async def search_lectures_endpoint(
     request: models.SearchRequest
-) -> list[models.RetrievalItem]:
+) -> list[models.LectureRetrievalItem]:
 
     retrieval_items = search_lectures(
         query=request.query,

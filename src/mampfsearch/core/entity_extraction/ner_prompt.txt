@@ -1,0 +1,64 @@
+You are an expert Named Entity Recognition (NER) system.
+Your task is to accept Text as input and extract named entities.
+Entities must have one of the following labels: {{ ', '.join(labels) }}.
+If a span is not an entity, label it: ==NONE==.
+
+Formatting rules (strict):
+- Output plain text only. Do NOT use Markdown or code formatting of any kind.
+  No bold (**), italics (* or _), inline code/backticks (`), code fences, headings (#),
+  link brackets ([]()), or tables.
+- One entity per line, numbered starting at 1.
+- Each line must be exactly:
+  "{index}. {text} | {True|False} | {LABEL or ==NONE==} | {brief reason}"
+- Use the exact tokens True or False for is_entity.
+- Use exactly ==NONE== for non-entities. For entities, use only the provided labels exactly as written.
+- Copy the entity text exactly as it appears in the paragraph (same hyphenation, spaces, punctuation, and casing).
+- Do not output anything besides the numbered entity lines after "Answer:".
+
+Ordering rules (strict and required):
+- Output entities strictly in the order they appear in the paragraph from left to right.
+- If the same phrase appears multiple times, include each occurrence in order (do not collapse duplicates).
+- Before writing the final "Answer:" lines, verify that each listed entity occurs at a later character position than the previous line.
+- If any item is out of order, reorder your list so that all lines are in true text order.
+- Do your reasoning silently; do not output your thought process—only the final numbered lines.
+
+{%- if description -%}
+{{ description }}
+{%- endif -%}
+
+{%- if label_definitions -%}
+Below are definitions of each label to guide which named entities to extract.
+Follow label definitions closely. Definitions are authoritative; examples are illustrative, not exhaustive.
+If a span matches a label definition, tag it even if it does not appear in the examples.
+{%- for label, definition in label_definitions.items() -%}
+{{ label }}: {{ definition }}
+{%- endfor -%}
+{%- endif -%}
+
+{%- if prompt_examples -%}
+Q: Given the paragraph below, identify a list of entities, and for each entry explain why it is or is not an entity:
+{%- for example in prompt_examples -%}
+Paragraph: {{ example.text }}
+Answer:
+{%- for span in example.spans -%}
+{{ loop.index }}. {{ span.to_str() }}
+{%- endfor -%}
+{%- endfor -%}
+{%- else -%}
+Here is an example of the required output format using different labels than this task.
+Use only the output format; use the labels provided above for the actual task.
+Do not output anything besides entities in this output format.
+Output entities strictly in the order they occur in the input paragraph.
+
+Q: Given the paragraph below, identify a list of entities, and for each entry explain why it is or is not an entity:
+
+Paragraph: Sriracha sauce goes really well with hoisin stir fry, but you should add it after you use the wok.
+Answer:
+1. Sriracha sauce | True | INGREDIENT | is an ingredient to add to a stir fry
+2. really well | False | ==NONE== | descriptive phrase, not a named entity
+3. hoisin stir fry | True | DISH | a named dish
+4. wok | True | EQUIPMENT | a piece of cooking equipment
+{%- endif -%}
+
+Paragraph: {{ text }}
+Answer:

@@ -1,0 +1,76 @@
+[
+  {
+    "text": "LDA ist ein linearer Klassifikator, der Gauß-Annahmen verwendet.",
+    "spans": [
+      { "text": "LDA", "is_entity": true, "label": "ALGORITHM", "reason": "benannter Algorithmus" },
+      { "text": "linearer Klassifikator", "is_entity": true, "label": "CONCEPT", "reason": "Modellkonzept" },
+      { "text": "Gauß-Annahmen", "is_entity": true, "label": "DISTRIBUTION", "reason": "benannte Verteilung" }
+    ]
+  },
+  {
+    "text": "Wir wenden die Bayes-Regel und die Kettenregel an, um die a-posteriori-Wahrscheinlichkeit abzuleiten.",
+    "spans": [
+      { "text": "Bayes-Regel", "is_entity": true, "label": "THEOREM_RULE", "reason": "benannte Regel" },
+      { "text": "Kettenregel", "is_entity": true, "label": "THEOREM_RULE", "reason": "benannte Regel" },
+      { "text": "a-posteriori-Wahrscheinlichkeit", "is_entity": true, "label": "CONCEPT", "reason": "probabilistisches Konzept" },
+      { "text": "abzuleiten", "is_entity": false, "label": "==NONE==", "reason": "allgemeines Verb" }
+    ]
+  },
+  {
+    "text": "Die logistische Sigmoid-Funktion und Softmax-Funktion bilden Eingaben auf Wahrscheinlichkeiten ab.",
+    "spans": [
+      { "text": "logistische Sigmoid-Funktion", "is_entity": true, "label": "FUNCTION", "reason": "benannte Funktion" },
+      { "text": "Softmax-Funktion", "is_entity": true, "label": "FUNCTION", "reason": "benannte Funktion" },
+      { "text": "Wahrscheinlichkeiten", "is_entity": true, "label": "CONCEPT", "reason": "mathematisches Konzept" },
+      { "text": "Eingaben", "is_entity": false, "label": "==NONE==", "reason": "allgemeines Substantiv" }
+    ]
+  },
+  {
+    "text": "Wir berechnen argmax über Klasse 1 und Klasse minus 1 unter Verwendung des Vorzeichens von x beta.",
+    "spans": [
+      { "text": "argmax", "is_entity": true, "label": "OPERATOR", "reason": "benannter Operator" },
+      { "text": "Vorzeichens", "is_entity": true, "label": "OPERATOR", "reason": "benannter Operator" },
+      { "text": "x", "is_entity": false, "label": "==NONE==", "reason": "Variable ausgeschlossen" },
+      { "text": "beta", "is_entity": false, "label": "==NONE==", "reason": "Parameter ausgeschlossen" }
+    ]
+  },
+  {
+    "text": "Neuronale Netze verwenden Gradientenabstieg mit einer Lernrate, um den Kreuzentropie-Verlust während des Rückwärtsdurchlaufs zu minimieren.",
+    "spans": [
+      { "text": "Neuronale Netze", "is_entity": true, "label": "ALGORITHM", "reason": "Algorithmenfamilie" },
+      { "text": "Gradientenabstieg", "is_entity": true, "label": "ALGORITHM", "reason": "Optimierungsalgorithmus" },
+      { "text": "Lernrate", "is_entity": true, "label": "CONCEPT", "reason": "Hyperparameter-Konzept" },
+      { "text": "Kreuzentropie-Verlust", "is_entity": true, "label": "FUNCTION", "reason": "benannte Verlustfunktion" },
+      { "text": "Rückwärtsdurchlaufs", "is_entity": true, "label": "CONCEPT", "reason": "Phase des neuronalen Netzes" },
+      { "text": "minimieren", "is_entity": false, "label": "==NONE==", "reason": "allgemeines Verb" }
+    ]
+  },
+  {
+    "text": "Die Kovarianzmatrix bestimmt die Entscheidungsgrenze zwischen Klassen mit gleichen Priors.",
+    "spans": [
+      { "text": "Kovarianzmatrix", "is_entity": true, "label": "CONCEPT", "reason": "statistisches Konzept" },
+      { "text": "Entscheidungsgrenze", "is_entity": true, "label": "CONCEPT", "reason": "Modellkonzept" },
+      { "text": "Priors", "is_entity": true, "label": "CONCEPT", "reason": "probabilistisches Konzept" },
+      { "text": "Klassen", "is_entity": false, "label": "==NONE==", "reason": "allgemeines Substantiv" }
+    ]
+  },
+  {
+    "text": "Nach Satz 2.17 und Satz 9.7 wenden wir den Satz von Bolzano-Weierstraß auf die Teilfolge an.",
+    "spans": [
+      { "text": "Satz 2.17", "is_entity": false, "label": "==NONE==", "reason": "nummerierte Referenz, kein benannter Satz" },
+      { "text": "Satz 9.7", "is_entity": false, "label": "==NONE==", "reason": "nummerierte Referenz, kein benannter Satz" },
+      { "text": "Satz von Bolzano-Weierstraß", "is_entity": true, "label": "THEOREM_RULE", "reason": "benannter Satz mit Eigennamen" },
+      { "text": "Teilfolge", "is_entity": true, "label": "CONCEPT", "reason": "mathematisches Konzept" }
+    ]
+  },
+  {
+    "text": "Sei phi eine Funktion, wobei phi von k gleich k Quadrat für k in N ist.",
+    "spans": [
+      { "text": "phi", "is_entity": false, "label": "==NONE==", "reason": "lokal definierte Funktionsvariable" },
+      { "text": "Funktion", "is_entity": false, "label": "==NONE==", "reason": "allgemeiner Begriff ohne spezifische Identität" },
+      { "text": "k", "is_entity": false, "label": "==NONE==", "reason": "Variable ausgeschlossen" },
+      { "text": "N", "is_entity": false, "label": "==NONE==", "reason": "Mengensymbol ausgeschlossen" },
+      { "text": "Quadrat", "is_entity": false, "label": "==NONE==", "reason": "allgemeine Operation" }
+    ]
+  }
+]

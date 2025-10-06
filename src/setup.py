@@ -14,8 +14,10 @@ setup(
         "openai",
         "transformers",
         "torch",
-        "qdrant_client",
-        "FlagEmbedding",
+        "spacy",
+        "spacy-llm @ git+https://github.com/f-buerckel/spacy-llm.git@main",
+        "langdetect",
+        "docling",
     ],
     entry_points={
         "console_scripts": [
