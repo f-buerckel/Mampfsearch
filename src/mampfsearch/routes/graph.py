@@ -3,6 +3,7 @@ from pathlib import Path
 
 from mampfsearch.utils import config, models
 from mampfsearch.core.entity_extraction import extract_entities
+from mampfsearch.retrievers import EntityRetriever
 
 router = APIRouter(
     prefix="/graph",
@@ -27,7 +28,19 @@ async def extract_entities_endpoint(
     info = extract_entities(
         file_path=Path(file),
         max_sentences_per_chunk=3,
-        print_chunks=True
+        print_chunks=False,
     )
 
     return info
+
+@router.get("/search")
+async def search_entities(
+    query: str,
+    limit: int,
+) -> list[models.EntityRetrievalItem]:
+    """Search entities with semantic search"""
+    
+    retriever = EntityRetriever()
+    responses = retriever.retrieve(query, limit)
+    
+    return responses

@@ -16,7 +16,7 @@ ENTITIES_COLLECTION_NAME = "Entities"
 PREFETCH_LIMIT = 50
 
 # If there is an entity embedding with cosine similarity above this threshold, we consider it the same entity.
-ENTITY_EMBED_SIM_THRESHOLD = 0.82
+ENTITY_EMBED_SIM_THRESHOLD = 0.83
 
 
 _embedding_model = None

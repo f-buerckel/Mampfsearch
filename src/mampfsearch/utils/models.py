@@ -67,34 +67,6 @@ class FileLocation(BaseModel):
     courseId: str
     fileId : str
 
-class Entity(BaseModel):
-    id: str
-    label: str
-    FileLocations: Optional[List[FileLocation]] = None
-    VideoLocations: Optional[List[VideoLocation]] = None
-
-    @classmethod
-    def from_entity_candidate(cls, entity_candidate):
-        return cls(
-            id = entity_candidate.text.lower(),
-            label = entity_candidate.label,
-            FileLocations = [entity_candidate.Location] if isinstance(entity_candidate.Location, FileLocation) else [],
-            VideoLocations = [entity_candidate.Location] if isinstance(entity_candidate.Location, VideoLocation) else [],
-        )
-
-
-class EntityRetrievalItem(BaseModel):
-    score : float
-    entity : Entity
-
-    @classmethod
-    def from_qdrant_point(cls, point):
-        return cls(
-            score=float(point.score),
-            entity=Entity(**point.payload)
-        )
-
-
 class EntityCandidate(BaseModel):
     """ 
     Entity candidates are single extracted entities from a document that may or may not already be in the knowledge base. 
@@ -103,6 +75,34 @@ class EntityCandidate(BaseModel):
     text: str
     label: str
     Location: Union[VideoLocation, FileLocation, None] = None
+
+class Entity(BaseModel):
+    name: str
+    label: str
+    entity_instances: Optional[List[EntityCandidate]] = []
+
+    @classmethod
+    def from_entity_candidate(cls, entity_candidate):
+        return cls(
+            name = entity_candidate.text.lower(),
+            label = entity_candidate.label,
+            entity_instances = [entity_candidate],
+        )
+
+
+class EntityRetrievalItem(BaseModel):
+    id : str
+    score : float
+    entity : Entity
+
+    @classmethod
+    def from_qdrant_point(cls, point):
+        return cls(
+            id =str(point.id),
+            score=float(point.score),
+            entity=Entity(**point.payload)
+        )
+
 
 
 class Response(BaseModel):

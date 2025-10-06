@@ -2,6 +2,14 @@ import spacy
 import time
 import logging
 import os
+import uuid
+
+from pathlib import Path
+from qdrant_client.models import PointStruct
+from langdetect import detect
+from enum import Enum
+from pathlib import Path
+from collections import Counter
 
 from mampfsearch.utils.models import EntityCandidate, EntityRetrievalItem, Entity, ExtractionInfo
 from mampfsearch.utils import config
@@ -16,12 +24,7 @@ from spacy.training import Example
 from spacy.tokens import Doc
 from spacy.lang.en import English
 from spacy_llm.util import assemble
-from pathlib import Path
 
-from qdrant_client.models import PointStruct
-from langdetect import detect
-from enum import Enum
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +136,7 @@ def extract_entities(
             logger.info(f"Chunk text:\n{chunk}")
             logger.info(f"Entities in chunk {i+1}:")
             for entity in chunk_entities:
-                logger.info(f" - {entity[0]} : {entity[1]}")
+                logger.info(f"{entity[0]} : {entity[1]}")
 
         logger.info(50*"-")
     
@@ -158,7 +161,7 @@ def insert_entity(entity_candidate: EntityCandidate):
         collection_name=config.ENTITIES_COLLECTION_NAME,
         points = [
             PointStruct(
-                id=1,
+                id=str(uuid.uuid4()),
                 payload = payload,
                 vector = {
                     "dense": embedding["dense_vecs"],
@@ -166,6 +169,8 @@ def insert_entity(entity_candidate: EntityCandidate):
             )
         ]
     )
+
+    return
 
 
 def insert_entity_candidate(
@@ -175,13 +180,14 @@ def insert_entity_candidate(
     retriever = EntityRetriever()
 
     results = retriever.retrieve(entity_candidate.text, limit=1)
+
     if not results or results[0].score < config.ENTITY_EMBED_SIM_THRESHOLD:
         logger.info(f"Inserting new entity '{entity_candidate.text}' with label '{entity_candidate.label}'")
         insert_entity(entity_candidate)
         return (1, 0)
 
     else:
-        logger.info(f"Entity '{entity_candidate.text}' already in knowledge base with id {results[0].entity.id} (score: {results[0].score})")
+        logger.info(f"Entity '{entity_candidate.text}' already in knowledge base with name {results[0].entity.name} (score: {results[0].score})")
         merge_entities(entity_candidate, results[0])
         return (0, 1)
     
@@ -191,4 +197,37 @@ def merge_entities(
     entity_candidate: EntityCandidate,
     entity_kb: EntityRetrievalItem,
     ):
-    pass
+
+    entity = entity_kb.entity
+    entity_instances = entity.entity_instances or []
+
+    labels = [ent.label for ent in entity_instances] + [entity_candidate.label]
+    most_common_label = Counter(labels).most_common(1)[0][0] # has form [("Theorem", 10)]
+
+    aliases = [ent.text for ent in entity_instances] + [entity_candidate.text]
+    most_common_name = Counter(aliases).most_common(1)[0][0] # has form [("backpropagation", 10)]
+
+    if most_common_label != entity.label:
+        logger.info(f"Updating entity '{entity.name}' label from '{entity.label}' to '{most_common_label}'")
+        entity.label = most_common_label
+
+    if most_common_name != entity.name:
+        logger.info(f"Updating entity '{entity.name}' name from '{entity.name}' to '{most_common_name}'")
+        entity.name = most_common_name
+    
+    entity_instances.append(entity_candidate)
+
+    id = entity_kb.id
+
+    client = config.get_qdrant_client()
+    client.set_payload(
+        collection_name=config.ENTITIES_COLLECTION_NAME,
+        payload = {
+            "name": entity.name,
+            "entity_instances": [entity_instance.model_dump() for entity_instance in entity_instances],
+            "label": entity.label,
+        },
+        points=[id],
+    )
+
+    return
