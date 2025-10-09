@@ -126,9 +126,9 @@ def extract_entities(
                 label = ent.label_,
             )
 
-            new_num, merged_num = insert_entity_candidate(entity_candidate)
-            num_new_inserted_entities += new_num
-            num_merged_entities += merged_num
+            is_new, is_merged = insert_entity_candidate(entity_candidate)
+            num_new_inserted_entities += is_new
+            num_merged_entities += is_merged
                 
         
         logger.debug(f"Found {len(chunk_entities)} entities: {chunk_entities}")
