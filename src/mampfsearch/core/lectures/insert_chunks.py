@@ -4,13 +4,13 @@ from typing import List
 from qdrant_client.models import PointStruct
 
 from mampfsearch.utils import config
-from mampfsearch.utils.models import Chunk
+from mampfsearch.utils.models import TranscriptChunk
 from mampfsearch.utils import helpers
 
 logger = logging.getLogger(__name__)
 
 def insert_chunks(
-        chunks : List[Chunk],
+        chunks : List[TranscriptChunk],
     ):
 
     vectors, payloads = create_embeddings_and_payloads(chunks)
@@ -19,7 +19,7 @@ def insert_chunks(
     return 
 
 def create_embeddings_and_payloads(
-        chunks : List[Chunk]
+        chunks : List[TranscriptChunk]
     ):
 
     payloads = []

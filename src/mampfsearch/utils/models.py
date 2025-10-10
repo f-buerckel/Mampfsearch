@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Union
 from datetime import timedelta
 from pathlib import Path
 
-class Chunk(BaseModel):
+class TranscriptChunk(BaseModel):
     text: str
     lecture_name: str
     lecture_position: int

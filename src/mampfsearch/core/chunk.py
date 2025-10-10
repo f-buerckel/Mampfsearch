@@ -6,7 +6,7 @@ from copy import copy
 from typing import List
 from pathlib import Path
 
-from mampfsearch.utils.models import Chunk
+from mampfsearch.utils.models import TranscriptChunk
 
 def chunk_srt(
     srt_file: str,
@@ -16,9 +16,9 @@ def chunk_srt(
     overlap: bool,
     output_file: str = None,
     max_chunk_size: int = 750,
-) -> List[Chunk]:
+) -> List[TranscriptChunk]:
     """
-    Chunk an SRT file and return a list of Chunk models.
+    Chunk an SRT file and return a list of TranscriptChunk models.
     """
     subs = list(get_srt(srt_file))
 
@@ -44,7 +44,7 @@ def chunk_srt(
        with open(output_file, "w", encoding="utf-8") as file:
             file.write(final_srt) 
 
-    # 5) map to Chunk models
+    # 5) map to TranscriptChunk models
     return subtitles_to_chunks(
         final_subtitles, lecture_name=lecture_name, lecture_position=lecture_position
     )
@@ -56,11 +56,11 @@ def get_srt(file_path):
         content = file.read()
     return srt.parse(content)
 
-def subtitles_to_chunks(final_subtitles: List[srt.Subtitle], lecture_name: str, lecture_position: int) -> List[Chunk]:
-    chunks: List[Chunk] = []
+def subtitles_to_chunks(final_subtitles: List[srt.Subtitle], lecture_name: str, lecture_position: int) -> List[TranscriptChunk]:
+    chunks: List[TranscriptChunk] = []
     for i, sub in enumerate(final_subtitles):
         chunks.append(
-            Chunk(
+            TranscriptChunk(
                 text=sub.content.strip(),
                 lecture_name=lecture_name,
                 lecture_position=lecture_position,
