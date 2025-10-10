@@ -72,5 +72,14 @@
       { "text": "N", "is_entity": false, "label": "==NONE==", "reason": "set symbol excluded" },
       { "text": "squared", "is_entity": false, "label": "==NONE==", "reason": "generic operation" }
     ]
-  }
+  },
+    {
+    "text": "We use the dot product, also written as u·v, to calculate the projection of a vector.",
+    "spans": [
+      { "text": "dot product", "is_entity": true, "label": "OPERATOR", "reason": "named operator" },
+      { "text": "projection", "is_entity": true, "label": "CONCEPT", "reason": "geometrical concept" },
+      { "text": "vector", "is_entity": true, "label": "CONCEPT", "reason": "mathematical object" },
+      { "text": "u·v", "is_entity": false, "label": "==NONE==", "reason": "symbolic representation of an operation" }
+    ]
+  } 
 ]

@@ -72,5 +72,14 @@
       { "text": "N", "is_entity": false, "label": "==NONE==", "reason": "Mengensymbol ausgeschlossen" },
       { "text": "Quadrat", "is_entity": false, "label": "==NONE==", "reason": "allgemeine Operation" }
     ]
+  },
+  {
+    "text": "Wir verwenden das Skalarprodukt, auch als u·v geschrieben, um die Projektion eines Vektors zu berechnen.",
+    "spans": [
+      { "text": "Skalarprodukt", "is_entity": true, "label": "OPERATOR", "reason": "benannter Operator" },
+      { "text": "Projektion", "is_entity": true, "label": "CONCEPT", "reason": "geometrisches Konzept" },
+      { "text": "Vektors", "is_entity": true, "label": "CONCEPT", "reason": "mathematisches Objekt" },
+      { "text": "u·v", "is_entity": false, "label": "==NONE==", "reason": "symbolische Darstellung einer Operation" }
+    ]
   }
 ]
