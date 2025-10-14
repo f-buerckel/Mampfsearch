@@ -16,17 +16,6 @@ services:
     networks:
       - qdrant-net
 
-#  whisper:
-#    build:
-#      context: ./whisper
-#    image: whisper-app
-#    container_name: whisper-container
-#    volumes:
-#      - ./lectures:/data
-#      - ./whisper/models:/root/.cache/whisper
-#    networks:
-#      - qdrant-net
-
   vllm:
     image: vllm/vllm-openai:latest
     ipc: host
@@ -49,16 +38,6 @@ services:
     networks:
       - qdrant-net
 
-#  ollama:
-#    image: ollama/ollama:latest
-#    container_name: ollama
-#    ports:
-#      - "11434:11434"
-#    volumes:
-#      - ollama:/root/.ollama
-#    networks:
-#      - qdrant-net
-#
 volumes:
   qdrant_data:
 
