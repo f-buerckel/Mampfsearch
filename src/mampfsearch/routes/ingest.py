@@ -1,6 +1,6 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks
-from mampfsearch.core.chunk import chunk_srt
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from mampfsearch.core.chunking import chunk_srt_file
 from mampfsearch.core.lectures.insert_chunks import insert_chunks
 from mampfsearch.core.transcribe import transcribe_lecture
 from mampfsearch.utils.models import IngestRequest, TranscriptionRequest
@@ -16,21 +16,26 @@ logger = logging.getLogger(__name__)
 async def ingest_transcript(
     request: IngestRequest,
 ):
+    
+    try:
+        chunks = chunk_srt_file(
+            srt_file=request.srt_file,
+            course_id=request.course_id,
+            lecture_id=request.lecture_id,
+            min_chunk_size=request.min_chunk_size,
+            max_chunk_size=request.max_chunk_size,
+            overlap=request.overlap,
+        )
 
-    chunks = chunk_srt(
-        srt_file=request.srt_file,
-        lecture_name=request.lecture_name,
-        lecture_position=request.lecture_position,
-        min_chunk_size=request.min_chunk_size,
-        max_chunk_size=request.max_chunk_size,
-        overlap=request.overlap,
-    )
+        logger.info(f"Generated {len(chunks)} chunks for lecture {request.lecture_id}")
 
-    logger.info(f"Generated {len(chunks)} chunks for lecture {request.lecture_name}")
+        insert_chunks(
+            chunks=chunks,
+        ) 
 
-    insert_chunks(
-        chunks=chunks,
-    ) 
+        return {"message": f"Successfully ingested {len(chunks)} chunks", "chunks": len(chunks)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/transcribe")
 async def transcribe_lecture_endpoint(

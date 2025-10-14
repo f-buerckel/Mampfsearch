@@ -1,16 +1,17 @@
 import logging
+import uuid
 
 from typing import List
 from qdrant_client.models import PointStruct
 
 from mampfsearch.utils import config
-from mampfsearch.utils.models import TranscriptChunk
+from mampfsearch.utils.models import Chunk
 from mampfsearch.utils import helpers
 
 logger = logging.getLogger(__name__)
 
 def insert_chunks(
-        chunks : List[TranscriptChunk],
+        chunks : List[Chunk],
     ):
 
     vectors, payloads = create_embeddings_and_payloads(chunks)
@@ -19,7 +20,7 @@ def insert_chunks(
     return 
 
 def create_embeddings_and_payloads(
-        chunks : List[TranscriptChunk]
+        chunks : List[Chunk]
     ):
 
     payloads = []
@@ -30,11 +31,10 @@ def create_embeddings_and_payloads(
     for chunk in chunks:
         payload = {
             "text": chunk.text,
-            "start_time": str(chunk.start_time),
-            "end_time": str(chunk.end_time),
-            "lecture_name": chunk.lecture_name,
-            "lecture_position" : chunk.lecture_position,
-            "position": chunk.position
+            "course_id": chunk.location.courseId,
+            "lecture_id": chunk.location.lectureId,
+            "start_time": str(chunk.location.start_time),
+            "end_time": str(chunk.location.end_time),
         }
 
         embedding = model.encode(chunk.text,
@@ -60,7 +60,7 @@ def upload(
             collection_name=collection_name,
             points = [
                 PointStruct(
-                    id=helpers.name_and_position_to_id(payloads[i]["lecture_name"], payloads[i]["position"], payloads[i]["lecture_position"]),
+                    id=str(uuid.uuid4()),
                     payload = payloads[i],
                     vector = {
                         "dense": embedding["dense_vecs"],

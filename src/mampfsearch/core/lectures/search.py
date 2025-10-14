@@ -50,7 +50,6 @@ def search_lectures_command(
     for response in responses:
         logger.info(f"Score: {response.score}")
         logger.info(f"Text: {response.text}")
-        logger.info(f"Lecture: {response.lecture} ({response.start_time} - {response.end_time})")
-        logger.info(f"Lecture position: {response.lecture_position}")
-        logger.info(f"Position: {response.position}")
+        logger.info(f"Course: {response.location.courseId}")
+        logger.info(f"Lecture: {response.location.lecture_id} ({response.location.start_time} - {response.location.end_time})")
         logger.info("-" * 50)

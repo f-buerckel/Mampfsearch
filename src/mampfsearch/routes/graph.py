@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from collections import Counter
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from mampfsearch.utils import config, models
 from mampfsearch.core.entity_extraction import extract_entities
@@ -17,7 +17,10 @@ router = APIRouter(
 @router.post("/extract")
 async def extract_entities_endpoint(
     file: Path,
-    background_task: BackgroundTasks = None
+    course_id: str,
+    lecture_id: Optional[str] = None,
+    background_task: BackgroundTasks = None,
+    print_chunks: bool = False,
 ):
 
     if not file.exists() or not file.is_file():
@@ -33,8 +36,9 @@ async def extract_entities_endpoint(
     background_task.add_task(
         extract_entities,
         file_path=Path(file),
-        max_sentences_per_chunk=3,
-        print_chunks=False,
+        course_id=course_id,
+        lecture_id=lecture_id,
+        print_chunks=print_chunks,
     ) 
 
     return {"message": "Entity extraction started in background"}

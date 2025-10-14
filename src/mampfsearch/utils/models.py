@@ -1,26 +1,45 @@
 import logging
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from enum import Enum
 from typing import List, Dict, Optional, Union
 from datetime import timedelta
 from pathlib import Path
 
-class TranscriptChunk(BaseModel):
-    text: str
-    lecture_name: str
-    lecture_position: int
-    position: int
+class VideoLocation(BaseModel):
+    courseId: str
+    lectureId: str
     start_time: Optional[timedelta] = None
     end_time: Optional[timedelta] = None
+
+    # format timestamp readable when using model_dump.
+    # https://docs.pydantic.dev/latest/concepts/serialization/#using-the-annotated-pattern
+    @field_serializer('start_time', 'end_time')
+    def serialize_timedelta(self, td: Optional[timedelta], _info) -> Optional[str]:
+        """Convert timedelta to HH:MM:SS format."""
+        if td is None:
+            return None
+        total_seconds = int(td.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+class FileLocation(BaseModel):
+    courseId: str
+    fileId : str
+
+class Chunk(BaseModel):
+    text: str
+    location: Union[VideoLocation, FileLocation, None] = None
 
 class TranscriptionRequest(BaseModel):
     audio_file: Path
 
 class IngestRequest(BaseModel):
     srt_file : Path
-    lecture_name: str
-    lecture_position: int = 0
+    course_id: str
+    lecture_id: str
     min_chunk_size: int = 350
     max_chunk_size: int = 850
     overlap: bool = True
@@ -39,33 +58,21 @@ class SearchRequest(BaseModel):
 class LectureRetrievalItem(BaseModel):
     score: float
     text: str
-    lecture: str
-    lecture_position: int
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    position: Optional[int] = None
+    video_location: Optional[VideoLocation] = None
 
     @classmethod
     def from_qdrant_point(cls, point):
         return cls(
             score=float(point.score),
             text=str(point.payload["text"]),
-            lecture=str(point.payload["lecture_name"]),
-            lecture_position=str(point.payload["lecture_position"]),
-            start_time=str(point.payload["start_time"]),
-            end_time=str(point.payload["end_time"]),
-            position=int(point.payload["position"]),
+            video_location=VideoLocation(
+                courseId=point.payload["course_id"],
+                lectureId=point.payload["lecture_id"],
+                start_time=str(point.payload["start_time"]),
+                end_time=str(point.payload["end_time"]),
+            ) if "course_id" in point.payload and "lecture_id" in point.payload else None
         )
 
-class VideoLocation(BaseModel):
-    courseId: str
-    fileId : str
-    lectureId: str
-    timestamp: str
-
-class FileLocation(BaseModel):
-    courseId: str
-    fileId : str
 
 class EntityCandidate(BaseModel):
     """ 

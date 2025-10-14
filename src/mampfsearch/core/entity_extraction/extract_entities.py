@@ -10,8 +10,10 @@ from langdetect import detect
 from enum import Enum
 from pathlib import Path
 from collections import Counter
+from typing import Union, Optional
 
-from mampfsearch.utils.models import EntityCandidate, EntityRetrievalItem, Entity, ExtractionInfo
+from mampfsearch.core.chunking import chunk_text_by_sentences, chunk_pdf_file, chunk_srt_file
+from mampfsearch.utils.models import EntityCandidate, EntityRetrievalItem, Entity, ExtractionInfo, Chunk, VideoLocation, FileLocation
 from mampfsearch.utils import config
 from mampfsearch.retrievers import EntityRetriever
 
@@ -28,43 +30,10 @@ from spacy_llm.util import assemble
 
 logger = logging.getLogger(__name__)
 
-def chunk_text_to_sentences(text: str, max_sentences_per_chunk: int = 5) -> list[str]:
-    """Chunk text into sentence groups for processing."""
-    nlp_sentencizer = English()
-    nlp_sentencizer.add_pipe("sentencizer")
-    
-    doc = nlp_sentencizer(text)
-    sentences = [sent.text.strip() for sent in doc.sents]
-    
-    chunks = []
-    for i in range(0, len(sentences), max_sentences_per_chunk):
-        chunk = " ".join(sentences[i:i + max_sentences_per_chunk])
-        chunks.append(chunk)
-    
-    return chunks
-
-def process_pdf(pdf_file_path: str) -> list[str]: 
-
-    pipeline_options = PdfPipelineOptions()
-    #pipeline_options.do_formula_enrichment = True
-
-    converter = DocumentConverter(format_options={
-        InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-    })
-
-    result = converter.convert(pdf_file_path)
-
-    doc = result.document
-    chunker = HybridChunker()
-    chunk_iter = chunker.chunk(dl_doc=doc)
-
-    chunks = [chunk.text for chunk in chunk_iter]
-    return chunks
-
-
 def extract_entities(
     file_path: Path,
-    max_sentences_per_chunk: int = 3,
+    course_id: str,
+    lecture_id: Optional[str] = None,
     print_chunks: bool = False
 ) -> ExtractionInfo:
 
@@ -80,14 +49,34 @@ def extract_entities(
 
     chunks = []
     if file_path.suffix == ".txt":
+        max_sentences_per_chunk = 3
         text_content = Path(file_path).read_text(encoding='utf-8')
-        chunks = chunk_text_to_sentences(text_content, max_sentences_per_chunk=max_sentences_per_chunk)
-        logger.debug(f"Created {len(chunks)} chunks")
+        chunks = chunk_text_by_sentences(
+            text=text_content,
+            course_id=course_id,
+            max_sentences_per_chunk=max_sentences_per_chunk,
+        )
 
     elif file_path.suffix == ".pdf":
-        chunks = process_pdf(file_path)
+        chunks = chunk_pdf_file(
+            pdf_file_path=file_path,
+            course_id=course_id,
+            enable_formula_enrichment=True
+        )
+    
+    elif file_path.suffix == ".srt":
+        # the high max_chunk_size encouages to keep sentences in one chunk.
+        min_chunk_size = 40
+        max_chunk_size = 400
+        chunks = chunk_srt_file(
+            srt_file=file_path,
+            course_id=course_id,
+            lecture_id=lecture_id if lecture_id else "unknown",
+            min_chunk_size=min_chunk_size,
+            max_chunk_size=max_chunk_size,
+        )
 
-    language = detect(" ".join(chunks[0:2]))
+    language = detect(" ".join([chunk.text for chunk in chunks[0:2]]))
     logger.info(f"Detected language: {language}")
 
     examples_file = examples_en_path
@@ -101,13 +90,13 @@ def extract_entities(
 
     
     for i, chunk in enumerate(chunks):
-        logger.info(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
+        logger.info(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk.text.split())} words)")
         
         # temporary fix for: https://github.com/vllm-project/vllm/issues/22403
         retry_attempts = 3
         for attempt in range(retry_attempts):
             try:
-                doc = nlp_llm(chunk)
+                doc = nlp_llm(chunk.text)
             except Exception as e:
                 logger.warning(f"Entity extraction failed for chunk {i} (attempt {attempt}/{retry_attempts}): {e}")
             else: 
@@ -124,6 +113,7 @@ def extract_entities(
             entity_candidate = EntityCandidate(
                 text = ent.text.lower(),
                 label = ent.label_,
+                Location = chunk.location
             )
 
             is_new, is_merged = insert_entity_candidate(entity_candidate)
@@ -139,6 +129,9 @@ def extract_entities(
                 logger.info(f"{entity[0]} : {entity[1]}")
 
         logger.info(50*"-")
+    
+    logger.info(f"Extraction complete. Extracted {num_extracted_entities} entities.")
+    logger.info(f"Inserted {num_new_inserted_entities} new entities, merged {num_merged_entities} existing entities.")
     
     return ExtractionInfo(
         num_extracted_entities=num_extracted_entities,
@@ -176,6 +169,7 @@ def insert_entity(entity_candidate: EntityCandidate):
 def insert_entity_candidate(
     entity_candidate: EntityCandidate,
     ):
+    # returns whether a new entity was inserted or an existing entity was merged: (is_new, is_merged)
 
     retriever = EntityRetriever()
 
