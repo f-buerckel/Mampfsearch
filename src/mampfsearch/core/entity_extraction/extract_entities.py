@@ -12,7 +12,7 @@ from pathlib import Path
 from collections import Counter
 from typing import Union, Optional
 
-from mampfsearch.core.chunking import chunk_text_by_sentences, chunk_pdf_file, chunk_srt_file
+from mampfsearch.core.chunking import chunk_text_file, chunk_pdf_file, chunk_srt_file
 from mampfsearch.utils.models import EntityCandidate, EntityRetrievalItem, Entity, ExtractionInfo, Chunk, VideoLocation, FileLocation
 from mampfsearch.utils import config
 from mampfsearch.retrievers import EntityRetriever
@@ -26,7 +26,6 @@ from spacy.training import Example
 from spacy.tokens import Doc
 from spacy.lang.en import English
 from spacy_llm.util import assemble
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,8 @@ def extract_entities(
     chunks = []
     if file_path.suffix == ".txt":
         max_sentences_per_chunk = 3
-        text_content = Path(file_path).read_text(encoding='utf-8')
-        chunks = chunk_text_by_sentences(
-            text=text_content,
+        chunks = chunk_text_file(
+            file_path=file_path,
             course_id=course_id,
             max_sentences_per_chunk=max_sentences_per_chunk,
         )
@@ -61,7 +59,7 @@ def extract_entities(
         chunks = chunk_pdf_file(
             pdf_file_path=file_path,
             course_id=course_id,
-            enable_formula_enrichment=True
+            enable_formula_enrichment=False
         )
     
     elif file_path.suffix == ".srt":
@@ -140,21 +138,33 @@ def extract_entities(
     )
 
 def insert_entity(entity_candidate: EntityCandidate):
+    entity_id = str(uuid.uuid4())
+    
+    insert_entity_qdrant(entity_id, entity_candidate)
+    
+    graph_storage = config.get_graph_storage()
+    graph_storage.insert_entity(
+        entity_id=entity_id,
+        entity_candidate=entity_candidate
+    )
 
+
+def insert_entity_qdrant(entity_id: str, entity_candidate: EntityCandidate):
+    
     model = config.get_embedding_model()
     entity_text = entity_candidate.text
 
     embedding = model.encode(entity_text, return_dense=True)
     payload = Entity.from_entity_candidate(entity_candidate).model_dump()
 
-    logger.debug(f"Inserting entity '{entity_candidate.text}')")
+    logger.debug(f"Inserting entity '{entity_candidate.text}' into Qdrant")
 
     qdrant_client = config.get_qdrant_client()
     qdrant_client.upsert(
         collection_name=config.ENTITIES_COLLECTION_NAME,
         points = [
             PointStruct(
-                id=str(uuid.uuid4()),
+                id=entity_id,
                 payload = payload,
                 vector = {
                     "dense": embedding["dense_vecs"],
@@ -163,7 +173,6 @@ def insert_entity(entity_candidate: EntityCandidate):
         ]
     )
 
-    return
 
 
 def insert_entity_candidate(
@@ -186,6 +195,7 @@ def insert_entity_candidate(
         return (0, 1)
     
     return (0, 0)
+
 
 def merge_entities(
     entity_candidate: EntityCandidate,
@@ -213,6 +223,13 @@ def merge_entities(
 
     id = entity_kb.id
 
+    merge_entities_qdrant(id, entity, entity_instances)
+
+    return
+
+
+def merge_entities_qdrant(entity_id: str, entity: Entity, entity_instances: list[EntityCandidate]):
+    
     client = config.get_qdrant_client()
     client.set_payload(
         collection_name=config.ENTITIES_COLLECTION_NAME,
@@ -221,7 +238,7 @@ def merge_entities(
             "entity_instances": [entity_instance.model_dump() for entity_instance in entity_instances],
             "label": entity.label,
         },
-        points=[id],
+        points=[entity_id],
     )
-
-    return
+    
+    logger.debug(f"Updated entity in Qdrant: {entity.name}")

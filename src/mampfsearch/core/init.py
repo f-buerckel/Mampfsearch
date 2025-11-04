@@ -11,8 +11,9 @@ def init():
     entities_info = create_entities_collection()
     logger.info("Collection initialization completed")
     return {
-        "collections": [lectures_info, entities_info]
+        "collections": [lectures_info, entities_info],
     }
+
 
 def create_lectures_collection():
     client = config.get_qdrant_client()

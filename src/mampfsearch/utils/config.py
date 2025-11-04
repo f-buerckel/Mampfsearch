@@ -1,5 +1,10 @@
+from mampfsearch.core.GraphStorage import Neo4jGraphStorage
 from pathlib import Path 
+from dotenv import load_dotenv
 import logging
+import os
+
+load_dotenv()
 
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
@@ -10,8 +15,11 @@ VLLM_PORT = 8001
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
 
+GRAPH_STORAGE = "neo4j"
+
 LECTURE_COLLECTION_NAME = "Lectures"
 ENTITIES_COLLECTION_NAME = "Entities"
+NEO4J_DATABASE_NAME = "neo4j"
 
 PREFETCH_LIMIT = 50
 
@@ -26,6 +34,27 @@ def get_embedding_model():
         from FlagEmbedding import BGEM3FlagModel
         _embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
     return _embedding_model
+
+_graph_storage = None
+def get_graph_storage():
+    global _graph_storage
+    if _graph_storage is None:
+        if GRAPH_STORAGE == "neo4j":
+            _graph_storage = _get_neo4j_graph_storage()
+        else:
+            raise ValueError(f"Unknown GRAPH_STORAGE: {GRAPH_STORAGE}")
+        
+    return _graph_storage
+
+def _get_neo4j_graph_storage():
+    neo4j_graph_storage = Neo4jGraphStorage(
+        url = os.getenv("NEO4J_URL", "bolt://localhost:7687"),
+        user = os.getenv("NEO4J_USER"), 
+        password = os.getenv("NEO4J_PASSWORD"),
+        database_name = NEO4J_DATABASE_NAME
+    )
+    return neo4j_graph_storage
+
 
 
 _qdrant_client = None
@@ -59,7 +88,7 @@ logging.basicConfig(
     ]
 )
 
-logging.getLogger(__name__).setLevel(logging.DEBUG)
+logging.getLogger("mampfsearch").setLevel(logging.DEBUG)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
