@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from mampfsearch.utils import config, models
-from mampfsearch.core.entity_extraction import extract_entities
+from mampfsearch.core.extraction_pipeline import extract_and_insert
 from mampfsearch.retrievers import EntityRetriever
 
 from qdrant_client.models import Filter, FieldCondition, MatchValue
@@ -34,7 +34,7 @@ async def extract_entities_endpoint(
         )
 
     background_task.add_task(
-        extract_entities,
+        extract_and_insert,
         file_path=Path(file),
         course_id=course_id,
         lecture_id=lecture_id,

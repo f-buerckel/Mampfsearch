@@ -1,0 +1,2 @@
+from .base_entity_linker import BaseEntityLinker
+from .embedding_entity_linker import EmbeddingEntityLinker

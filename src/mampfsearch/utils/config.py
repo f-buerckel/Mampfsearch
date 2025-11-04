@@ -1,4 +1,4 @@
-from mampfsearch.core.GraphStorage import Neo4jGraphStorage
+from mampfsearch.core.graph_storage import Neo4jGraphStorage
 from pathlib import Path 
 from dotenv import load_dotenv
 import logging
@@ -47,13 +47,13 @@ def get_graph_storage():
     return _graph_storage
 
 def _get_neo4j_graph_storage():
-    neo4j_graph_storage = Neo4jGraphStorage(
+    storage = Neo4jGraphStorage(
         url = os.getenv("NEO4J_URL", "bolt://localhost:7687"),
         user = os.getenv("NEO4J_USER"), 
         password = os.getenv("NEO4J_PASSWORD"),
         database_name = NEO4J_DATABASE_NAME
     )
-    return neo4j_graph_storage
+    return storage
 
 
 
