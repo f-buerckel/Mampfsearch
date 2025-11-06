@@ -1,23 +1,21 @@
 import logging
-import os
+
 from pathlib import Path
-from typing import List
 
+from spacy.lang.en import English
+from spacy.lang.de import German
 from spacy_llm.util import assemble
-
-from mampfsearch.utils.models import EntityCandidate, Chunk
-from . import BaseNER
+from spacy.tokens import Span
 
 logger = logging.getLogger(__name__)
 
-
-class LLM_NER(BaseNER):
+class LLM_NER():
     
     def __init__(self, language: str = "en", retry_attempts: int = 3):
         self.language = language
         self.retry_attempts = retry_attempts
         self.nlp_llm = self._initialize_model()
-    
+
     def _initialize_model(self):
         file_dir = Path(__file__).parent
         config_path = file_dir / "ner_config.cfg"
@@ -39,31 +37,32 @@ class LLM_NER(BaseNER):
             }
         )
     
-    def extract(self, chunk: Chunk) -> List[EntityCandidate]:
-        
+    def __call__(self, doc):
         for attempt in range(self.retry_attempts):
             try:
-                doc = self.nlp_llm(chunk.text)
+                # Not really that pretty but I saw no other way to modify the original llm component to retry.
+                llm_doc = self.nlp_llm(doc.text)
+
+                # have to rebuild the entities
+                new_ents = []
+                for ent in llm_doc.ents:
+                    # Create new Span with original doc's vocab
+                    span = Span(doc, ent.start, ent.end, label=ent.label_)
+                    new_ents.append(span)
                 
-                entities = [
-                    EntityCandidate(
-                        text=ent.text.lower(),
-                        label=ent.label_,
-                        Location=chunk.location
-                    )
-                    for ent in doc.ents
-                ]
-                
-                return entities
-                
+                doc.ents = new_ents
+                logger.info(f"LLM NER extracted the following entities: {[ent.text for ent in doc.ents]}")
+                return doc
             except Exception as e:
-                logger.warning(
-                    f"Entity extraction failed (attempt {attempt + 1}/{self.retry_attempts}): {e}"
-                )
-                if attempt == self.retry_attempts - 1:
-                    logger.error(
-                        f"Entity extraction failed after {self.retry_attempts} retries"
-                    )
-                    return []
-        
-        return []
+                logger.warning(f"LLM NER call failed on attempt {attempt + 1}/{self.retry_attempts}: {e}")
+
+        return doc
+
+@English.factory("llm_ner")
+def create_english_llm_ner(nlp, name):
+    return LLM_NER(language="en")
+
+@German.factory("llm_ner")
+def create_german(nlp, name):
+    return LLM_NER(language="de")
+
