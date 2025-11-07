@@ -11,9 +11,6 @@ from qdrant_client.models import PointStruct
 
 logger = logging.getLogger(__name__)
 
-if not Span.has_extension("is_new_entity"):
-    Span.set_extension("is_new_entity", default=False)
-
 @Language.factory("embedding_entity_linker")
 def create_embedding_entity_linker(nlp: Language, name: str):
     return EmbeddingEntityLinker()
@@ -37,12 +34,10 @@ class EmbeddingEntityLinker():
                 # match found
                 logger.debug(f"Entity '{ent.text}' matched with {results[0].id}")
                 entity_id = results[0].id
-                ent._.is_new_entity = False
             else:
                 # New entity - insert immediately
                 logger.info(f"No match found for entity '{ent.text}', inserting now")
                 entity_id = str(uuid.uuid4())
-                ent._.is_new_entity = True
                 
                 # Create entity candidate and insert
                 entity_candidate = EntityCandidate(
