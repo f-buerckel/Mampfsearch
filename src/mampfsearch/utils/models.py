@@ -6,6 +6,8 @@ from typing import List, Dict, Optional, Union
 from datetime import timedelta
 from pathlib import Path
 
+from spacey.tokens import Span, Doc
+
 class VideoLocation(BaseModel):
     courseId: str
     lectureId: str
@@ -111,17 +113,17 @@ class EntityRetrievalItem(BaseModel):
         )
 
 class RelationshipCandidate(BaseModel):
-    entity_1: str
-    entity_2: str
-    sentence: str
-    context: str
+    entity_1: Span
+    entity_2: Span
+    sentence: Span
+    context: Doc
 
 class Relationship(BaseModel):
-    entity_1: str
-    entity_2: str
+    entity_1: Span
+    entity_2: Span
     relationship: str
     reasoning: str
-    context: str
+    context: Span
 
 class Response(BaseModel):
     answer: str

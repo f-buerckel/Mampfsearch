@@ -27,6 +27,10 @@ PREFETCH_LIMIT = 50
 ENTITY_EMBED_SIM_THRESHOLD = 0.83
 
 
+# Maximum words allowed between entities to consider a possible relationship between them
+MAX_WORDS_BETWEEN_ENTITIES_FOR_RELATIONSHIP = 15
+
+
 _embedding_model = None
 def get_embedding_model():
     global _embedding_model
