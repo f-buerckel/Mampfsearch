@@ -110,7 +110,18 @@ class EntityRetrievalItem(BaseModel):
             entity=Entity(**point.payload)
         )
 
+class RelationshipCandidate(BaseModel):
+    entity_1: str
+    entity_2: str
+    sentence: str
+    context: str
 
+class Relationship(BaseModel):
+    entity_1: str
+    entity_2: str
+    relationship: str
+    reasoning: str
+    context: str
 
 class Response(BaseModel):
     answer: str

@@ -18,6 +18,11 @@ if not Span.has_extension("is_new_entity"):
 def create_embedding_entity_linker(nlp: Language, name: str):
     return EmbeddingEntityLinker()
 
+# TODO: Determine if this should really be a spaCy component?
+# I dont know what the spaCy philosophy is regarding component that take a document and interact with an external database.
+# Because now this component step is really state dependent does not contribute to other steps.
+# On the other hand in theory it takes a document, processes it and returns a document with optionally some enriched annotations.
+# Practical Concern: As a spaCy component I cant make it async which would be nice for the calls to the graph storage.
 class EmbeddingEntityLinker():
 
     def __init__(self):

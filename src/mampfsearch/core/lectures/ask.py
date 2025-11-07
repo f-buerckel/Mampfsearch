@@ -17,7 +17,7 @@ async def ask(question: str,
               ) -> Response:
     """Ask a question and get the answer from the lectures"""
 
-    client = config.get_llm_client()
+    client = config.get_async_llm_client()
 
     response = search_lectures(
         query=question,

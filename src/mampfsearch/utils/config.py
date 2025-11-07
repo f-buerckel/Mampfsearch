@@ -70,12 +70,21 @@ def get_qdrant_client():
     return _qdrant_client
 
 
+_async_llm_client = None
+def get_async_llm_client():
+    global _async_llm_client
+    if _async_llm_client is None:
+        from openai import AsyncOpenAI
+        _async_llm_client = AsyncOpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
+
+    return _async_llm_client
+
 _llm_client = None
 def get_llm_client():
     global _llm_client
     if _llm_client is None:
-        from openai import AsyncOpenAI
-        _llm_client = AsyncOpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
+        from openai import OpenAI
+        _llm_client = OpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
 
     return _llm_client
 

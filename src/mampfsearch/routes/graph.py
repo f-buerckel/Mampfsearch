@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from mampfsearch.utils import config, models
-from mampfsearch.core.extraction_pipeline import extract_and_insert, extract
+from mampfsearch.core.extraction_pipeline import extract
 from mampfsearch.retrievers import EntityRetriever
 
 from qdrant_client.models import Filter, FieldCondition, MatchValue
