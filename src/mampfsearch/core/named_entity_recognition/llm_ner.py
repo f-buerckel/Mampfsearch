@@ -47,11 +47,10 @@ class LLM_NER():
         for attempt in range(self.retry_attempts):
             try:
                 llm_doc = self.nlp_llm(doc.text)
-                validated_ents = self.validate_entities(list(llm_doc.ents))
 
                 # have to rebuild the entities
                 new_ents = []
-                for ent in validated_ents:
+                for ent in llm_doc.ents:
                     # Create new Span with original doc's vocab
                     span = Span(doc, ent.start, ent.end, label=ent.label_)
                     new_ents.append(span)
@@ -64,25 +63,3 @@ class LLM_NER():
 
         return doc
     
-    @staticmethod
-    def validate_entities(ents):
-        llm_client = config.get_llm_client()
-        for ent in ents:
-            prompt = prompts.NER_VALIDATION_PROMPT.format(entity = ent.text)
-            response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": prompt,
-                    },
-                ],
-            )
-            content = response.choices[0].message.content.lower()
-            if "yes" in content:
-                logger.debug(f"Entity '{ent.text}' with label '{ent.label_}' validated by LLM.")
-            else:
-                logger.info(f"Entity '{ent.text}' with label '{ent.label_}' rejected by LLM.")
-                ents.remove(ent)
-        return ents
-            
