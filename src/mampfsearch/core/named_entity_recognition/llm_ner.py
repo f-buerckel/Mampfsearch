@@ -2,17 +2,23 @@ import logging
 
 from pathlib import Path
 
-from spacy.lang.en import English
-from spacy.lang.de import German
+from mampfsearch.utils import config, prompts
+
+from spacy import Language
 from spacy_llm.util import assemble
 from spacy.tokens import Span
 
 logger = logging.getLogger(__name__)
 
+@Language.factory(
+    "llm_ner_v2",
+    default_config={"retry_attempts": 3},
+    assigns=["doc.ents"],
+    )
 class LLM_NER():
     
-    def __init__(self, language: str = "en", retry_attempts: int = 3):
-        self.language = language
+    def __init__(self, nlp, name, retry_attempts: int = 3):
+        self.language = nlp.lang
         self.retry_attempts = retry_attempts
         self.nlp_llm = self._initialize_model()
 
@@ -40,12 +46,12 @@ class LLM_NER():
     def __call__(self, doc):
         for attempt in range(self.retry_attempts):
             try:
-                # Not really that pretty but I saw no other way to modify the original llm component to retry.
                 llm_doc = self.nlp_llm(doc.text)
+                validated_ents = self.validate_entities(list(llm_doc.ents))
 
                 # have to rebuild the entities
                 new_ents = []
-                for ent in llm_doc.ents:
+                for ent in validated_ents:
                     # Create new Span with original doc's vocab
                     span = Span(doc, ent.start, ent.end, label=ent.label_)
                     new_ents.append(span)
@@ -57,12 +63,26 @@ class LLM_NER():
                 logger.warning(f"LLM NER call failed on attempt {attempt + 1}/{self.retry_attempts}: {e}")
 
         return doc
-
-@English.factory("llm_ner")
-def create_english_llm_ner(nlp, name):
-    return LLM_NER(language="en")
-
-@German.factory("llm_ner")
-def create_german(nlp, name):
-    return LLM_NER(language="de")
-
+    
+    @staticmethod
+    def validate_entities(ents):
+        llm_client = config.get_llm_client()
+        for ent in ents:
+            prompt = prompts.NER_VALIDATION_PROMPT.format(entity = ent.text)
+            response = llm_client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": prompt,
+                    },
+                ],
+            )
+            content = response.choices[0].message.content.lower()
+            if "yes" in content:
+                logger.debug(f"Entity '{ent.text}' with label '{ent.label_}' validated by LLM.")
+            else:
+                logger.info(f"Entity '{ent.text}' with label '{ent.label_}' rejected by LLM.")
+                ents.remove(ent)
+        return ents
+            
