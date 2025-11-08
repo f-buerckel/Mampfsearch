@@ -1,12 +1,12 @@
 import logging
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, field_serializer, ConfigDict
 from enum import Enum
 from typing import List, Dict, Optional, Union
 from datetime import timedelta
 from pathlib import Path
 
-from spacey.tokens import Span, Doc
+from spacy.tokens import Span, Doc
 
 class VideoLocation(BaseModel):
     courseId: str
@@ -113,17 +113,19 @@ class EntityRetrievalItem(BaseModel):
         )
 
 class RelationshipCandidate(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Add this line
     entity_1: Span
     entity_2: Span
     sentence: Span
     context: Doc
 
 class Relationship(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Add this line
     entity_1: Span
     entity_2: Span
     relationship: str
     reasoning: str
-    context: Span
+    context: Doc
 
 class Response(BaseModel):
     answer: str
