@@ -1,5 +1,6 @@
 import logging 
 import re
+import json
 from . import BaseGraphStorage
 from neo4j import GraphDatabase
 from neo4j.exceptions import Neo4jError
@@ -27,7 +28,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         location = entity_candidate.Location
         
         try:
-            location_data = location.model_dump()
+            location_json = json.dumps(location.model_dump()) if location else None
             
             self.driver.execute_query(
                 """
@@ -36,17 +37,16 @@ class Neo4jGraphStorage(BaseGraphStorage):
                     name: $name,
                     label: $label,
                     text: $text,
-                    locations: $locations
+                    locations: $locations,
                     aliases: $aliases,
-                    created_at: datetime(),
-                    
+                    created_at: datetime()
                 })
                 """,
                 id=entity_id,
                 name=entity_candidate.text.lower(),
                 label=entity_candidate.label,
                 text=entity_candidate.text,
-                locations=[location_data],
+                locations=[location_json], 
                 aliases=[entity_candidate.text.lower()],
                 database_=self.database_name,
             )
@@ -57,18 +57,18 @@ class Neo4jGraphStorage(BaseGraphStorage):
             logger.error(f"Failed to insert entity into Neo4j: {e.message}")
     
     def merge_entity(self, entity_id: str, entity_alias: str, entity_candidate: EntityCandidate):
-        location_data = entity_candidate.Location.model_dump()
+        location_json = json.dumps(entity_candidate.Location.model_dump())
         try:
             self.driver.execute_query(
                 """
                 MATCH (e:Entity {id: $id})
-                SET e.aliases = e.aliases + $alias
-                    e.locations = e.locations + $location
+                SET e.aliases = e.aliases + $alias,
+                    e.locations = e.locations + $location,
                     e.updated_at = datetime()
                 """,
                 id=entity_id,
-                alias=entity_alias,
-                location=location_data,
+                alias=[entity_alias],
+                location=[location_json], 
                 database_=self.database_name,
             )
             logger.debug(f"Merged alias '{entity_alias}' into entity '{entity_id}'")
