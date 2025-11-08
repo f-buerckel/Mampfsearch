@@ -9,7 +9,7 @@ from spacy.tokens import Doc
 
 from mampfsearch.core.chunking import chunk_file
 from mampfsearch.core import named_entity_recognition
-from mampfsearch.core import entity_linking
+from mampfsearch.core import linking
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def extract(
         course_id=course_id,
         lecture_id=lecture_id,
     )
-    
+
     language = detect(" ".join([chunk.text for chunk in chunks[0:2]]))
     logger.info(f"Detected language: {language}")
 
