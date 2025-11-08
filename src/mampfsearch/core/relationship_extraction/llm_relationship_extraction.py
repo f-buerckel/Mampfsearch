@@ -37,6 +37,9 @@ class RelationshipExtractionLLM:
     def extract_relationships(self, candidates: list[RelationshipCandidate]) -> list[Relationship]:
         relationships = []
         for candidate in candidates:
+            # Check if token level KB IDs are equal. If so they are the same entity and we probably want to skip this relationship.
+            if candidate.entity_1[0].ent_kb_id_ == candidate.entity_2[0].ent_kb_id_:
+                continue  # Skip if both entities link to the same KB ID
             prompt = RELATIONSHIP_EXTRACTION_PROMPT.format(
                 entity1=candidate.entity_1.text,
                 entity2=candidate.entity_2.text,
