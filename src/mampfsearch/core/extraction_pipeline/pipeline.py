@@ -20,7 +20,6 @@ def extract(
     file_path: Path,
     course_id: str,
     lecture_id: Optional[str] = None,
-    print_chunks: bool = False
 ):
 
     chunks = chunk_file(
@@ -37,8 +36,15 @@ def extract(
     else:
         nlp = spacy.blank("en")
 
-    nlp.add_pipe("llm_ner")
+    nlp.add_pipe("sentencizer")
+    nlp.add_pipe("llm_ner_v2")
+    nlp.add_pipe("llm_ner_validation")
     nlp.add_pipe("embedding_entity_linker")
+    nlp.add_pipe("llm_relationship_extraction")
+    nlp.add_pipe("llm_relationship_validation")
+    nlp.add_pipe("simple_relationship_linker")
+    
+    logger.debug(f"Pipeline problems: {nlp.analyze_pipes()['problems']}")
     
     docs = []
     for chunk in chunks:
