@@ -1,1 +1,0 @@
-from .embedding_entity_linker import EmbeddingEntityLinker 
