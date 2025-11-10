@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # TODO: Determine if this should really be a spaCy component?
 # I dont know what the spaCy philosophy is regarding component that take a document and interact with an external database.
-# Because now this component step is really state dependent does not contribute to other steps.
-# On the other hand in theory it takes a document, processes it and returns a document with optionally some enriched annotations.
+# Because now this component step is really state dependent and has different outcomse based on the state of the graph storage.
+# On the other hand in theory it takes a document, processes it and returns a document with some enriched annotations.
 # Practical Concern: As a spaCy component I cant make it async which would be nice for the calls to the graph storage.
 
 @Language.factory(
