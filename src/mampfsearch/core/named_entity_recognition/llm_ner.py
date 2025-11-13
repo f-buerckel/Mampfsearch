@@ -1,8 +1,6 @@
 import logging
 
 from pathlib import Path
-
-
 from spacy import Language
 from spacy_llm.util import assemble
 from spacy.tokens import Span

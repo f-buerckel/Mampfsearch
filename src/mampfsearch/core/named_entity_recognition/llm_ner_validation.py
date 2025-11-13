@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
     requires=["doc.ents"],
     assigns=["doc.ents"],
 )
-class LLM_NER_Validation:
+class LLM_NER_VALIDATION:
     def __init__(self, nlp, name):
         self.llm_client = config.get_llm_client()
 
