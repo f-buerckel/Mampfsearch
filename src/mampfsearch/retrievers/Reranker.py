@@ -2,10 +2,11 @@ from .base import BaseRetriever
 from typing import List
 from mampfsearch.utils import config
 from mampfsearch.utils.models import LectureRetrievalItem
+from rerankers.reranker import Reranker
 
 
 class RerankerRetriever(BaseRetriever):
-    def __init__(self, base_retriever: BaseRetriever, reranker: "Reranker"):
+    def __init__(self, base_retriever: BaseRetriever, reranker: Reranker):
         """
         Initialize the RerankerRetriever with a base retriever and a reranker.
 

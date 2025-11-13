@@ -1,2 +1,7 @@
 from .embedding_entity_linker import EmbeddingEntityLinker
 from .simple_relationship_linker import SimpleRelationshipLinker
+
+__all__ = [
+    "EmbeddingEntityLinker",
+    "SimpleRelationshipLinker",
+]

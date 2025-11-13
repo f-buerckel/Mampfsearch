@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    embedding_model = config.get_embedding_model()
-    qdrant_client = config.get_qdrant_client()
-    llm_client = config.get_llm_client()
+    config.get_embedding_model()
+    config.get_qdrant_client()
+    config.get_llm_client()
     yield
 
 
