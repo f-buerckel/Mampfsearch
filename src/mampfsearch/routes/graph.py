@@ -20,7 +20,6 @@ async def extract_entities_endpoint(
     course_id: str,
     lecture_id: Optional[str] = None,
     background_task: BackgroundTasks = None,
-    print_chunks: bool = False,
 ):
 
     if not file.exists() or not file.is_file():
@@ -34,12 +33,10 @@ async def extract_entities_endpoint(
         )
 
     background_task.add_task(
-        #extract_and_insert,
         extract,
         file_path=Path(file),
         course_id=course_id,
         lecture_id=lecture_id,
-        print_chunks=print_chunks,
     ) 
 
     return {"message": "Entity extraction started in background"}

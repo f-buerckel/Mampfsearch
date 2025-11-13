@@ -122,3 +122,30 @@ class Neo4jGraphStorage(BaseGraphStorage):
         except Neo4jError as e:
             logger.error(f"Failed to insert relationship: {e}")
             return False
+        
+    def get_relationship_id(
+        self,
+        entity_1_id: str,
+        relationship: str,
+        entity_2_id: str,
+    ) -> Optional[str]:
+        """Return the relationship id if it exists, else None."""
+        sanitized_relationship = re.sub(r"\W+", "_", relationship or "").strip("_")
+        cypher = f"""
+        MATCH (:Entity {{id: $entity_1_id}})-[r:{sanitized_relationship}]->(:Entity {{id: $entity_2_id}})
+        RETURN r.id AS id
+        LIMIT 1
+        """
+        try:
+            result, _, _ = self.driver.execute_query(
+                cypher,
+                entity_1_id=entity_1_id,
+                entity_2_id=entity_2_id,
+                database_=self.database_name,
+            )
+            if result and len(result) > 0:
+                return result[0].get("id")
+            return None
+        except Neo4jError as e:
+            logger.error(f"Failed to fetch relationship id: {e}")
+            return None

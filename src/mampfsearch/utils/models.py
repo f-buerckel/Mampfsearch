@@ -116,7 +116,6 @@ class RelationshipCandidate(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)  # Add this line
     entity_1: Span
     entity_2: Span
-    sentence: Span
     context: Doc
 
 class Relationship(BaseModel):

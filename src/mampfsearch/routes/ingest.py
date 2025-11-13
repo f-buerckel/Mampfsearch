@@ -38,6 +38,7 @@ async def ingest_transcript(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/transcribe")
+# TODO: Ensure that only one transcription job is running, otherwise whisper crashes as two whisper instances use too much vram.
 async def transcribe_lecture_endpoint(
     request: TranscriptionRequest,
     background_task: BackgroundTasks

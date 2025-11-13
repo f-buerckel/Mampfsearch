@@ -43,7 +43,6 @@ class RelationshipExtractionLLM:
             prompt = RELATIONSHIP_EXTRACTION_PROMPT.format(
                 entity1=candidate.entity_1.text,
                 entity2=candidate.entity_2.text,
-                sentence=candidate.sentence.text,
                 context=candidate.context.text,
             )
             try:
@@ -90,21 +89,19 @@ class RelationshipExtractionLLM:
 
     def extract_relationship_candidates(self, doc) -> list[RelationshipCandidate]:
         candidates = []
-        for sent in doc.sents:
-            if len(sent.ents) < 2:
-                continue
-            for i, ent1 in enumerate(sent.ents):
-                for ent2 in sent.ents[i+1:]:
-                    words_between_entities = doc[ent1.start:ent2.end].text
-                    word_distance = len(words_between_entities.split(" "))
-                    if word_distance <= self.max_words_between_entities:
-                        candidate = RelationshipCandidate(
-                            entity_1=ent1,
-                            entity_2=ent2,
-                            sentence=sent,
-                            context=doc,
-                        )
-                        candidates.append(candidate)
+        if len(doc.ents) < 2:
+            return candidates
+        for i, ent1 in enumerate(doc.ents):
+            for ent2 in doc.ents[i+1:]:
+                words_between_entities = doc[ent1.start:ent2.end].text
+                word_distance = len(words_between_entities.split(" "))
+                if word_distance <= self.max_words_between_entities:
+                    candidate = RelationshipCandidate(
+                        entity_1=ent1,
+                        entity_2=ent2,
+                        context=doc,
+                    )
+                    candidates.append(candidate)
         return candidates
     
     @staticmethod

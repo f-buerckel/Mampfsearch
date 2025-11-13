@@ -42,44 +42,79 @@ Respond in the following JSON format:
 }}"""
 
 
-RELATIONSHIP_EXTRACTION_PROMPT = """You are an expert at extracting semantic relationships between entities in educational text.
+RELATIONSHIP_EXTRACTION_PROMPT = """You are an expert at extracting semantic relationships between entities in educational/math text.
 
-Given two entities and the sentence containing them, determine:
-1. Whether a meaningful, general relationship exists between the entities
-2. If yes, express the relationship as a concise verb phrase (2-4 words)
+Task:
+Given two entities and the text containing them, decide if there is a meaningful, general relationship that holds in a context-independent way. If yes, choose exactly one label from the ALLOWED_RELATIONS below. If no suitable label applies or the direction is wrong, return "NO_RELATIONSHIP".
 
-**IMPORTANT: Relationships are DIRECTED**
-- The relationship must flow from Entity 1 to Entity 2
-- The sentence "Entity 1 [relationship] Entity 2" must make semantic sense
-- For example: "softmax function" + "normalizes" + "output" = "softmax function normalizes output" ✓
-- If the relationship only makes sense in reverse, output "NO_RELATIONSHIP"
+IMPORTANT: Relationships are DIRECTED
+- The relationship must flow from Entity 1 to Entity 2.
+- The phrase "Entity 1 [relationship] Entity 2" must be a coherent, correct statement.
+- If the relationship only makes sense in reverse, output "NO_RELATIONSHIP".
 
-**Guidelines:**
-- Only extract direct, general relationships (e.g., "normalizes", "is part of", "trains", "produces")
-- Use concise verb phrases that describe the relationship type
-- Return "NO_RELATIONSHIP" if:
-  - The entities merely co-occur without a clear semantic connection
-  - The relationship is only context-specific or instance-based, not a general property
-- Focus on relationships that would be true in general, not just in this specific example
+ALLOWED_RELATIONS (use exactly one of these labels or "NO_RELATIONSHIP"):
+- is_a — Taxonomic hierarchy (A is a type of B). Example: "Graph is_a Data Structure"
+- part_of — Substructure or containment (A is a component of B). Example: "Vertex part_of Graph"
+- instance_of — Specific example (A is an instance of B). Example: "Binary Tree instance_of Tree"
+- generalizes — A is more general than B (B is a special case of A). Example: "Function generalizes Linear Function"
+- specializes — A is more specific than B (A is a subtype/special case of B). Example: "Linear Function specializes Function"
+- defined_by — A is defined/formalized by B (rule, limit, axioms, formula). Example: "Derivative defined_by Limit"
+- depends_on — A logically/computationally depends on B. Example: "Integral depends_on Integrand"
+- derived_from — A is obtained/computed from B. Example: "Gradient derived_from Loss"
+- represented_by — A has representation B (symbolic/graphical/data structure). Example: "Matrix represented_by 2D Array"
+- equivalent_to — A is logically equivalent to B (bidirectional). Example: "Undirected Graph equivalent_to Symmetric Adjacency Matrix"
+- inverses — A is the inverse of B (mutual inverse). Example: "EncryptionAlgorithm inverses DecryptionAlgorithm"
+- implies — A logically implies B. Example: "Finite set implies Countable set"
+- contradicts — A is incompatible with B. Example: "P ≠ NP contradicts P = NP"
+- proved_by — A (claim/theorem) is proved by B (proof/method). Example: "Theorem proved_by Proof"
+- used_in — A (tool/result) is used in B (larger result/method). Example: "Lemma used_in Theorem"
+- applies_to — A (method/rule) applies to B (object/domain). Example: "Algorithm applies_to Graph"
+- solves — A (method/algorithm) solves B (problem/task). Example: "Dijkstra's algorithm solves Shortest Path"
+- computes — A (function/algorithm) computes B (quantity/output). Example: "Softmax computes Probabilities"
+- requires — A (method/algorithm) requires B (input/hyperparameter/assumption). Example: "Gradient Descent requires Learning Rate"
+- complexity_of — A (e.g., O(n log n)) is the complexity of B (algorithm/problem). Example: "O(n log n) complexity_of MergeSort"
 
+Guidelines:
+- Choose a relation only if it is general and context-independent.
+- Prefer the most specific applicable label.
+- Mere co-occurrence or instance-specific/temporary states → "NO_RELATIONSHIP".
+- Symmetric relations (equivalent_to, contradicts, inverses) still require correct direction: "Entity 1 [relation] Entity 2" must read sensibly.
+- If uncertain or no allowed label fits, return "NO_RELATIONSHIP".
 
-**Examples:**
-Sentence: "The softmax function normalizes the network output into a probability distribution."
-Entity 1: softmax function
-Entity 2: network output
-Response:
+Output format:
+First provide brief reasoning, then output JSON:
 {{
-  "reasoning": "The softmax function performs a specific action (normalization) on the network output. This is a general property of the softmax function. Direction check: 'softmax function normalizes network output' ✓",
-  "relationship": "normalizes"
+  "reasoning": "your explanation here",
+  "relationship": "<one of the labels above or NO_RELATIONSHIP>"
 }}
+
+Examples:
 
 Sentence: "Backpropagation is an algorithm for training neural networks."
 Entity 1: Backpropagation
 Entity 2: neural networks
 Response:
 {{
-  "reasoning": "Backpropagation is explicitly described as having the purpose of training neural networks. This is a general, definitional relationship. Direction check: 'Backpropagation trains neural networks' ✓",
-  "relationship": "trains"
+  "reasoning": "Backpropagation is a method applicable to neural networks in general.",
+  "relationship": "applies_to"
+}}
+
+Sentence: "O(n log n) is the time complexity of MergeSort."
+Entity 1: O(n log n)
+Entity 2: MergeSort
+Response:
+{{
+  "reasoning": "The expression denotes the complexity class of MergeSort.",
+  "relationship": "complexity_of"
+}}
+
+Sentence: "The softmax function outputs probabilities."
+Entity 1: softmax function
+Entity 2: probabilities
+Response:
+{{
+  "reasoning": "Softmax generally computes probabilities from logits.",
+  "relationship": "computes"
 }}
 
 Sentence: "Here the derivative is a diagonal matrix."
@@ -87,33 +122,17 @@ Entity 1: derivative
 Entity 2: diagonal matrix
 Response:
 {{
-  "reasoning": "This describes a property of the derivative in this specific case only ('here'). Derivatives are not always diagonal matrices, so this is context-specific.",
+  "reasoning": "This is a context-specific, temporary statement, not a general relation.",
   "relationship": "NO_RELATIONSHIP"
 }}
 
-Sentence: "The gradient descent optimizer and the learning rate both affect convergence speed."
-Entity 1: gradient descent optimizer
-Entity 2: learning rate
-Response:
-{{
-  "reasoning": "Both entities affect the same thing (convergence speed) but there's no direct relationship between them - they're just mentioned together. 'Gradient descent optimizer learning rate' doesn't form a meaningful relationship.",
-  "relationship": "NO_RELATIONSHIP"
-}}
+Now decide for the following:
 
-**First provide your reasoning for your choice, then output your final answer in the following JSON format:**
-{{
-  "reasoning": "your explanation here",
-  "relationship": "verb phrase or NO_RELATIONSHIP"
-}}
+Your Text: {context}
 
-
-**Your Context:** {context}
-
-**Your Sentence:** {sentence}
-
-**Entity 1:** {entity1}
-**Entity 2:** {entity2}
-```"""
+Entity 1: {entity1}
+Entity 2: {entity2}
+"""
 
 NER_VALIDATION_PROMPT = """You are an expert at validating named entities in mathematical and educational text.
 
