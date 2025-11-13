@@ -1,5 +1,4 @@
 from mampfsearch.core.graph_storage import Neo4jGraphStorage
-from pathlib import Path
 from dotenv import load_dotenv
 import logging
 import os

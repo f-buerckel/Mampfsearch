@@ -8,7 +8,6 @@ from typing import Optional
 from spacy.tokens import Doc
 
 from mampfsearch.core.chunking import chunk_file
-from mampfsearch.core import named_entity_recognition, linking, relationship_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +51,6 @@ def extract(
         docs.append(doc)
 
     # Proccess chunks in batches like this is usually more efficient, see: https://spacy.io/usage/processing-pipelines#processing
-    final_docs = list(nlp.pipe(docs))
+    list(nlp.pipe(docs))
 
     logger.info(f"Extraction pipeline completed for file: {file_path.name}")

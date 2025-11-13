@@ -1,4 +1,3 @@
-from hashlib import md5
 
 
 # Converts the bge embeddings into the correct format for qdrant

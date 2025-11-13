@@ -2,11 +2,11 @@
 
 import logging
 from pathlib import Path
-from typing import List, Union
+from typing import List
 
 from spacy.lang.en import English
 
-from mampfsearch.utils.models import Chunk, FileLocation, VideoLocation
+from mampfsearch.utils.models import Chunk, FileLocation
 
 logger = logging.getLogger(__name__)
 

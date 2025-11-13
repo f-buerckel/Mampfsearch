@@ -1,11 +1,10 @@
 import logging
 import json
 
-from openai import AsyncOpenAI
 
 from mampfsearch.core.lectures.search import search_lectures
 
-from mampfsearch.utils.prompts import QA_PROMPT, RAG_PROMPT_JSON
+from mampfsearch.utils.prompts import RAG_PROMPT_JSON
 from mampfsearch.utils.models import Response, RetrieverTypeEnum
 from mampfsearch.utils import config
 

@@ -2,7 +2,7 @@ import logging
 
 from enum import Enum
 from fastapi import APIRouter, HTTPException
-from mampfsearch.core.init import init, create_lectures_collection
+from mampfsearch.core.init import init
 from mampfsearch.utils import config
 
 router = APIRouter(

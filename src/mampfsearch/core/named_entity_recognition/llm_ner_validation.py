@@ -1,7 +1,6 @@
 import logging
 
 from spacy import Language
-from spacy.tokens import Doc
 from mampfsearch.utils import config, prompts
 
 

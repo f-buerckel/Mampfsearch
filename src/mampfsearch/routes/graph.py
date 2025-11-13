@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from collections import Counter
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from mampfsearch.utils import config, models
 from mampfsearch.core.extraction_pipeline import extract

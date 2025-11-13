@@ -1,4 +1,3 @@
-import logging
 
 from pydantic import BaseModel, field_serializer, ConfigDict
 from enum import Enum

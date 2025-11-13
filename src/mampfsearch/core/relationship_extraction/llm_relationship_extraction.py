@@ -8,7 +8,6 @@ from mampfsearch.utils import config
 from mampfsearch.utils.models import Relationship, RelationshipCandidate
 from mampfsearch.utils.prompts import (
     RELATIONSHIP_EXTRACTION_PROMPT,
-    RELATIONSHIP_VALIDATION_PROMPT,
 )
 
 

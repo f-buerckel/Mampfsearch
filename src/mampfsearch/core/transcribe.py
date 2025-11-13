@@ -1,12 +1,9 @@
-import subprocess
-import os
 import logging
 import torch
 
 from pathlib import Path
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
-from mampfsearch.utils import config
 
 logger = logging.getLogger(__name__)
 

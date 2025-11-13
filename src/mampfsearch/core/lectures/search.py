@@ -3,7 +3,7 @@ import logging
 
 from rerankers import Reranker
 
-from mampfsearch.utils import config, helpers, models
+from mampfsearch.utils import config, models
 from mampfsearch import retrievers
 
 logger = logging.getLogger(__name__)

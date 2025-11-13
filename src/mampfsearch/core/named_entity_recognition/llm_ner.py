@@ -2,7 +2,6 @@ import logging
 
 from pathlib import Path
 
-from mampfsearch.utils import config, prompts
 
 from spacy import Language
 from spacy_llm.util import assemble

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from mampfsearch.core.lectures.search import search_lectures
 from mampfsearch.core.lectures.ask import ask
-from mampfsearch.utils import config, models
+from mampfsearch.utils import models
 
 router = APIRouter(
     prefix="/lectures",

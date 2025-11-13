@@ -4,7 +4,6 @@ from mampfsearch.core.chunking import chunk_srt_file
 from mampfsearch.core.lectures.insert_chunks import insert_chunks
 from mampfsearch.core.transcribe import transcribe_lecture
 from mampfsearch.utils.models import IngestRequest, TranscriptionRequest
-from mampfsearch.utils import config
 
 router = APIRouter(
     tags=["Ingest"],

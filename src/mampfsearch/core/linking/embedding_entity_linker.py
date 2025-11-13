@@ -2,7 +2,6 @@ import logging
 import uuid
 
 from spacy import Language
-from spacy.tokens import Span, Doc
 
 from mampfsearch.utils import config
 from mampfsearch.retrievers import EntityRetriever
