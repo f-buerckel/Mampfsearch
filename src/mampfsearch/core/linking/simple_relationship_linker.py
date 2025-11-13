@@ -28,26 +28,36 @@ class SimpleRelationshipLinker:
             rel_type = rel.relationship
 
             if not ent1_id or not ent2_id:
-                logger.warning(f"Could not link relationship '{rel.relationship}' due to missing entity IDs: ent1_id={ent1_id}, ent2_id={ent2_id}")
+                logger.warning(
+                    f"Could not link relationship '{rel.relationship}' due to missing entity IDs: ent1_id={ent1_id}, ent2_id={ent2_id}"
+                )
                 continue
-            
-            relationship_id = self.graph_db.get_relationship_id(ent1_id, rel_type, ent2_id)
+
+            relationship_id = self.graph_db.get_relationship_id(
+                ent1_id, rel_type, ent2_id
+            )
             if relationship_id is not None:
-                logger.debug(f"Found existing relationship '{rel.relationship}' between entities {ent1_id} and {ent2_id}")
+                logger.debug(
+                    f"Found existing relationship '{rel.relationship}' between entities {ent1_id} and {ent2_id}"
+                )
             else:
                 relationship_id = str(uuid.uuid4())
-                logger.debug(f"Creating new relationship '{rel.relationship}' between entities {ent1_id} and {ent2_id}")
+                logger.debug(
+                    f"Creating new relationship '{rel.relationship}' between entities {ent1_id} and {ent2_id}"
+                )
                 self.insert_relationship_into_storage(rel, relationship_id)
             doc._.rel_kb_id[offset] = relationship_id
 
         return doc
-    
-    def insert_relationship_into_storage(self, relationship: Relationship, relationship_id: str):
+
+    def insert_relationship_into_storage(
+        self, relationship: Relationship, relationship_id: str
+    ):
         """Insert relationship into graph storage immediately"""
         self.graph_db.insert_relationship(
             relationship_id=relationship_id,
             entity_1_id=relationship.entity_1[0].ent_kb_id_,
             entity_2_id=relationship.entity_2[0].ent_kb_id_,
             relationship=relationship.relationship,
-            reasoning=relationship.reasoning
+            reasoning=relationship.reasoning,
         )

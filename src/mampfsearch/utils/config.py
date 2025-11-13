@@ -1,5 +1,5 @@
 from mampfsearch.core.graph_storage import Neo4jGraphStorage
-from pathlib import Path 
+from pathlib import Path
 from dotenv import load_dotenv
 import logging
 import os
@@ -32,14 +32,20 @@ MAX_WORDS_BETWEEN_ENTITIES_FOR_RELATIONSHIP = 15
 
 
 _embedding_model = None
+
+
 def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         from FlagEmbedding import BGEM3FlagModel
+
         _embedding_model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
     return _embedding_model
 
+
 _graph_storage = None
+
+
 def get_graph_storage():
     global _graph_storage
     if _graph_storage is None:
@@ -47,58 +53,67 @@ def get_graph_storage():
             _graph_storage = _get_neo4j_graph_storage()
         else:
             raise ValueError(f"Unknown GRAPH_STORAGE: {GRAPH_STORAGE}")
-        
+
     return _graph_storage
+
 
 def _get_neo4j_graph_storage():
     storage = Neo4jGraphStorage(
-        url = os.getenv("NEO4J_URL", "bolt://localhost:7687"),
-        user = os.getenv("NEO4J_USER"), 
-        password = os.getenv("NEO4J_PASSWORD"),
-        database_name = NEO4J_DATABASE_NAME
+        url=os.getenv("NEO4J_URL", "bolt://localhost:7687"),
+        user=os.getenv("NEO4J_USER"),
+        password=os.getenv("NEO4J_PASSWORD"),
+        database_name=NEO4J_DATABASE_NAME,
     )
     return storage
 
 
-
 _qdrant_client = None
+
+
 def get_qdrant_client():
     global _qdrant_client
     if _qdrant_client is None:
         from qdrant_client import QdrantClient
-        _qdrant_client = QdrantClient(
-            host=QDRANT_HOST,
-            port=QDRANT_PORT
-        )
+
+        _qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
     return _qdrant_client
 
 
 _async_llm_client = None
+
+
 def get_async_llm_client():
     global _async_llm_client
     if _async_llm_client is None:
         from openai import AsyncOpenAI
-        _async_llm_client = AsyncOpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
+
+        _async_llm_client = AsyncOpenAI(
+            base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
+        )
 
     return _async_llm_client
 
+
 _llm_client = None
+
+
 def get_llm_client():
     global _llm_client
     if _llm_client is None:
         from openai import OpenAI
-        _llm_client = OpenAI(base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy")
+
+        _llm_client = OpenAI(
+            base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
+        )
 
     return _llm_client
 
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(module)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('../mampfsearch.log'),
-        logging.StreamHandler() 
-    ]
+    format="%(asctime)s - %(module)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("../mampfsearch.log"), logging.StreamHandler()],
 )
 
 logging.getLogger("mampfsearch").setLevel(logging.DEBUG)

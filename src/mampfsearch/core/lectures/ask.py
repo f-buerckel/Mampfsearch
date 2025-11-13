@@ -11,26 +11,27 @@ from mampfsearch.utils import config
 
 logger = logging.getLogger(__name__)
 
-async def ask(question: str,
-              retriever: RetrieverTypeEnum = RetrieverTypeEnum.hybrid,
-              limit: int = 5,
-              ) -> Response:
+
+async def ask(
+    question: str,
+    retriever: RetrieverTypeEnum = RetrieverTypeEnum.hybrid,
+    limit: int = 5,
+) -> Response:
     """Ask a question and get the answer from the lectures"""
 
     client = config.get_async_llm_client()
 
     response = search_lectures(
-        query=question,
-        limit=limit,
-        retriever_type=retriever,
-        reranking=False
+        query=question, limit=limit, retriever_type=retriever, reranking=False
     )
     if len(response) == 0:
         logger.info("No results found.")
         return '{"answer": "I could not find any relevant information to answer this question.", "confidence_score": 0.0, "source_snippets": {}}'
 
     contexts = [hit.text for hit in response]
-    context_str = "\n\n".join(f"{i+1}: {passage}" for i, passage in enumerate(contexts))
+    context_str = "\n\n".join(
+        f"{i + 1}: {passage}" for i, passage in enumerate(contexts)
+    )
 
     prompt = RAG_PROMPT_JSON.format(question=question, context=context_str)
 
@@ -53,9 +54,9 @@ async def ask(question: str,
         response_dic = {
             "answer": "I could not generate a valid answer.",
             "confidence_score": 0.0,
-            "source_snippets": {}
+            "source_snippets": {},
         }
-    
+
     logger.info(f"Answer: {response_dic['answer']}")
 
     response = Response(**response_dic)

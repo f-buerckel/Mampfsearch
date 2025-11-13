@@ -10,10 +10,10 @@ from mampfsearch.utils import config
 
 logger = logging.getLogger(__name__)
 
-def transcribe_lecture(
-        audio_file: Path, 
-    ):
 
+def transcribe_lecture(
+    audio_file: Path,
+):
     if not audio_file.exists():
         logger.error(f"Audio file not found at: {audio_file}")
         raise FileNotFoundError(f"Audio file not found at: {audio_file}")
@@ -39,8 +39,8 @@ def transcribe_lecture(
         device=device,
     )
 
-    output_srt_file = audio_file.with_suffix('.srt')
-    output_txt_file = audio_file.with_suffix('.txt')
+    output_srt_file = audio_file.with_suffix(".srt")
+    output_txt_file = audio_file.with_suffix(".txt")
     logger.info(f"Transcription srt will be saved to: {output_srt_file}")
     logger.info(f"Transcription text will be saved to: {output_txt_file}")
 
@@ -64,13 +64,13 @@ def format_timestamp(seconds: float) -> str:
     millis = int((seconds - int(seconds)) * 1000)  # always 0–999
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
+
 def to_srt(segments, output_file="output.srt"):
     """Convert segments into an SRT file."""
     with open(output_file, "w", encoding="utf-8") as f:
         for idx, seg in enumerate(segments, start=1):
             start, end = seg["timestamp"]
             text = seg["text"].strip()
-
 
             f.write(f"{idx}\n")
             f.write(f"{format_timestamp(start)} --> {format_timestamp(end)}\n")

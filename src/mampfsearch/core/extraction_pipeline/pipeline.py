@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 if not Doc.has_extension("location"):
     Doc.set_extension("location", default=None)
 
+
 def extract(
     file_path: Path,
     course_id: str,
     lecture_id: Optional[str] = None,
 ):
-
     chunks = chunk_file(
         file_path=file_path,
         course_id=course_id,
@@ -30,7 +30,7 @@ def extract(
     language = detect(" ".join([chunk.text for chunk in chunks[0:2]]))
     logger.info(f"Detected language: {language}")
 
-    if language == 'de':
+    if language == "de":
         nlp = spacy.blank("de")
     else:
         nlp = spacy.blank("en")
@@ -42,16 +42,16 @@ def extract(
     nlp.add_pipe("llm_relationship_extraction")
     nlp.add_pipe("llm_relationship_validation")
     nlp.add_pipe("simple_relationship_linker")
-    
+
     logger.debug(f"Pipeline problems: {nlp.analyze_pipes()['problems']}")
-    
+
     docs = []
     for chunk in chunks:
         doc = nlp.make_doc(chunk.text)
         doc._.location = chunk.location
         docs.append(doc)
-    
+
     # Proccess chunks in batches like this is usually more efficient, see: https://spacy.io/usage/processing-pipelines#processing
     final_docs = list(nlp.pipe(docs))
-    
+
     logger.info(f"Extraction pipeline completed for file: {file_path.name}")

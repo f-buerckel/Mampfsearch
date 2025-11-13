@@ -1,4 +1,4 @@
-import logging 
+import logging
 import re
 import json
 from . import BaseGraphStorage
@@ -11,25 +11,18 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-class Neo4jGraphStorage(BaseGraphStorage):
 
-    def __init__(self,
-     url: str,
-     user: str,
-     password: str,
-     database_name: str
-    ):
-        
+class Neo4jGraphStorage(BaseGraphStorage):
+    def __init__(self, url: str, user: str, password: str, database_name: str):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.database_name = database_name
 
-
     def insert_entity(self, entity_id: str, entity_candidate: EntityCandidate):
         location = entity_candidate.Location
-        
+
         try:
             location_json = json.dumps(location.model_dump()) if location else None
-            
+
             self.driver.execute_query(
                 """
                 CREATE (e:Entity {
@@ -46,17 +39,19 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 name=entity_candidate.text.lower(),
                 label=entity_candidate.label,
                 text=entity_candidate.text,
-                locations=[location_json], 
+                locations=[location_json],
                 aliases=[entity_candidate.text.lower()],
                 database_=self.database_name,
             )
-            
+
             logger.debug(f"Inserted entity into Neo4j: {entity_candidate.text}")
-            
+
         except Neo4jError as e:
             logger.error(f"Failed to insert entity into Neo4j: {e.message}")
-    
-    def merge_entity(self, entity_id: str, entity_alias: str, entity_candidate: EntityCandidate):
+
+    def merge_entity(
+        self, entity_id: str, entity_alias: str, entity_candidate: EntityCandidate
+    ):
         location_json = json.dumps(entity_candidate.Location.model_dump())
         try:
             self.driver.execute_query(
@@ -68,16 +63,12 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 """,
                 id=entity_id,
                 alias=[entity_alias],
-                location=[location_json], 
+                location=[location_json],
                 database_=self.database_name,
             )
             logger.debug(f"Merged alias '{entity_alias}' into entity '{entity_id}'")
         except Neo4jError as e:
             logger.error(f"Failed to merge entity alias into Neo4j: {e.message}")
-
-
-
-            
 
     def insert_relationship(
         self,
@@ -122,7 +113,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         except Neo4jError as e:
             logger.error(f"Failed to insert relationship: {e}")
             return False
-        
+
     def get_relationship_id(
         self,
         entity_1_id: str,

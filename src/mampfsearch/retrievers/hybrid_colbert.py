@@ -3,24 +3,25 @@ from typing import List
 from mampfsearch.utils import config, helpers
 from mampfsearch.utils.models import LectureRetrievalItem
 
+
 class HybridColbertRerankingRetriever(BaseRetriever):
-        
-    def retrieve(self, query: str, collection_name: str, limit: int) -> List[LectureRetrievalItem]:
+    def retrieve(
+        self, query: str, collection_name: str, limit: int
+    ) -> List[LectureRetrievalItem]:
         from qdrant_client import models
 
         client = config.get_qdrant_client()
         model = config.get_embedding_model()
 
         query_embedding = model.encode(
-            [query],
-            return_dense=True,
-            return_sparse=True,
-            return_colbert_vecs=True
+            [query], return_dense=True, return_sparse=True, return_colbert_vecs=True
         )
 
         prefetch = [
             models.Prefetch(
-                query=helpers.convert_sparse_vector(query_embedding["lexical_weights"][0]),
+                query=helpers.convert_sparse_vector(
+                    query_embedding["lexical_weights"][0]
+                ),
                 using="sparse",
                 limit=config.PREFETCH_LIMIT,
             ),
@@ -28,7 +29,7 @@ class HybridColbertRerankingRetriever(BaseRetriever):
                 query=query_embedding["dense_vecs"][0],
                 using="dense",
                 limit=config.PREFETCH_LIMIT,
-            )
+            ),
         ]
 
         points = client.query_points(
@@ -39,4 +40,6 @@ class HybridColbertRerankingRetriever(BaseRetriever):
             limit=limit,
         )
 
-        return [LectureRetrievalItem.from_qdrant_point(point) for point in points.points]
+        return [
+            LectureRetrievalItem.from_qdrant_point(point) for point in points.points
+        ]

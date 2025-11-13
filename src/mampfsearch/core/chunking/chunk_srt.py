@@ -10,7 +10,7 @@ from mampfsearch.core.chunking._helpers import (
     split_subtitle_at_periods,
     merge_until_sentence_complete,
     merge_until_min_size,
-    split_large_chunks
+    split_large_chunks,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,14 +27,14 @@ def chunk_srt_file(
 ) -> List[Chunk]:
     """
     Chunk an SRT subtitle file into semantically coherent blocks.
-    
+
     The chunking process:
     1. Split subtitles at sentence boundaries (periods)
     2. Merge consecutive sentences into complete blocks
     -- now every block ends with a full sentence --
     3. Grow blocks to reach min_chunk_size (with optional overlap)
     4. Split any blocks exceeding max_chunk_size
-    
+
     Args:
         srt_file: Path to the .srt file
         course_id: Course identifier for metadata
@@ -43,18 +43,18 @@ def chunk_srt_file(
         max_chunk_size: Maximum characters per chunk
         overlap: If True, add context from adjacent subtitles
         output_file: Optional path to save final SRT for inspection
-        
+
     Returns:
         List of Chunk objects with VideoLocation metadata
-        
+
     Raises:
         ValueError: If max_chunk_size < min_chunk_size or file is not .srt
     """
     if max_chunk_size < min_chunk_size:
         raise ValueError("max_chunk_size must be >= min_chunk_size")
-    
+
     logger.info(f"Chunking SRT file: {srt_file.name}")
-    
+
     subs = list(_parse_srt_file(srt_file))
     logger.debug(f"Loaded {len(subs)} raw subtitles")
 
@@ -87,15 +87,13 @@ def _parse_srt_file(file_path: Path) -> List[srt.Subtitle]:
     """Parse an SRT file into subtitle objects."""
     if file_path.suffix != ".srt":
         raise ValueError(f"Not a valid SRT file: {file_path}")
-    
+
     content = file_path.read_text(encoding="utf-8")
     return srt.parse(content)
 
 
 def _subtitles_to_chunks(
-    subtitles: List[srt.Subtitle], 
-    course_id: str, 
-    lecture_id: str
+    subtitles: List[srt.Subtitle], course_id: str, lecture_id: str
 ) -> List[Chunk]:
     """Convert subtitle objects to Chunk models with VideoLocation."""
     chunks = []
@@ -106,7 +104,7 @@ def _subtitles_to_chunks(
                 courseId=course_id,
                 lectureId=lecture_id,
                 start_time=sub.start,
-                end_time=sub.end
+                end_time=sub.end,
             ),
         )
         chunks.append(chunk)

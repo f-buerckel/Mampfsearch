@@ -12,11 +12,11 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
+
 @router.post("/ingest")
 async def ingest_transcript(
     request: IngestRequest,
 ):
-    
     try:
         chunks = chunk_srt_file(
             srt_file=request.srt_file,
@@ -31,18 +31,20 @@ async def ingest_transcript(
 
         insert_chunks(
             chunks=chunks,
-        ) 
+        )
 
-        return {"message": f"Successfully ingested {len(chunks)} chunks", "chunks": len(chunks)}
+        return {
+            "message": f"Successfully ingested {len(chunks)} chunks",
+            "chunks": len(chunks),
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/transcribe")
 # TODO: Ensure that only one transcription job is running, otherwise whisper crashes as two whisper instances use too much vram.
 async def transcribe_lecture_endpoint(
-    request: TranscriptionRequest,
-    background_task: BackgroundTasks
+    request: TranscriptionRequest, background_task: BackgroundTasks
 ):
-
     background_task.add_task(transcribe_lecture, audio_file=request.audio_file)
     return {"message": "Transcription started in background"}

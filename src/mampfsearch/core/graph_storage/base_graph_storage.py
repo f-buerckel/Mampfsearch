@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from mampfsearch.utils.models import EntityCandidate
 from typing import Optional
 
+
 class BaseGraphStorage(ABC):
     """
     Abstract base class for graph storage implementations.

@@ -7,6 +7,7 @@ from mampfsearch.routes import maintenance, ingest, lectures, graph
 
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     embedding_model = config.get_embedding_model()
@@ -14,17 +15,19 @@ async def lifespan(app: FastAPI):
     llm_client = config.get_llm_client()
     yield
 
+
 app = FastAPI(
     title="MampfSearch API",
     description="API for MampfSearch - a search engine for lecture videos",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.include_router(maintenance.router)
 app.include_router(ingest.router)
 app.include_router(lectures.router)
 app.include_router(graph.router)
+
 
 @app.get("/")
 async def root():

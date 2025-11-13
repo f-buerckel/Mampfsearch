@@ -8,11 +8,11 @@ router = APIRouter(
     tags=["Lectures"],
 )
 
+
 @router.post("/search")
 async def search_lectures_endpoint(
-    request: models.SearchRequest
+    request: models.SearchRequest,
 ) -> list[models.LectureRetrievalItem]:
-
     retrieval_items = search_lectures(
         query=request.query,
         limit=request.limit,
@@ -22,11 +22,9 @@ async def search_lectures_endpoint(
 
     return retrieval_items
 
-@router.post("/ask")
-async def ask_lectures_endpoint(
-    request: models.AskRequest
-) -> models.Response:
 
+@router.post("/ask")
+async def ask_lectures_endpoint(request: models.AskRequest) -> models.Response:
     response = await ask(
         question=request.question,
         retriever=request.retriever_type,

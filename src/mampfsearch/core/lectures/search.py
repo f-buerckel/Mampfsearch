@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings()
 
-def search_lectures(
-        query: str,
-        limit: int,
-        retriever_type: models.RetrieverTypeEnum,
-        reranking: bool =False
-        ) -> list[models.LectureRetrievalItem]:
 
+def search_lectures(
+    query: str,
+    limit: int,
+    retriever_type: models.RetrieverTypeEnum,
+    reranking: bool = False,
+) -> list[models.LectureRetrievalItem]:
     """Search lectures with keyword or semantic search"""
 
     retriever = retrievers.HybridRetriever()
@@ -28,22 +28,24 @@ def search_lectures(
         retriever = retrievers.HybridColbertRerankingRetriever()
     else:
         raise ValueError(f"Unknown retriever type: {retriever_type}")
- 
+
     if reranking:
-        reranker = Reranker('BAAI/bge-reranker-v2-m3', verbose=False)
-        retriever = retrievers.RerankerRetriever(base_retriever=retriever, reranker=reranker)
+        reranker = Reranker("BAAI/bge-reranker-v2-m3", verbose=False)
+        retriever = retrievers.RerankerRetriever(
+            base_retriever=retriever, reranker=reranker
+        )
 
     responses = retriever.retrieve(query, config.LECTURE_COLLECTION_NAME, limit)
 
     return responses
 
-def search_lectures_command(
-        query : str,
-        limit : int,
-        retriever : models.RetrieverTypeEnum,
-        reranking : bool,
-    ):
 
+def search_lectures_command(
+    query: str,
+    limit: int,
+    retriever: models.RetrieverTypeEnum,
+    reranking: bool,
+):
     """Retrieve relevant lecture parts for a given query"""
 
     responses = search_lectures(query, limit, retriever, reranking)
@@ -51,5 +53,7 @@ def search_lectures_command(
         logger.info(f"Score: {response.score}")
         logger.info(f"Text: {response.text}")
         logger.info(f"Course: {response.location.courseId}")
-        logger.info(f"Lecture: {response.location.lecture_id} ({response.location.start_time} - {response.location.end_time})")
+        logger.info(
+            f"Lecture: {response.location.lecture_id} ({response.location.start_time} - {response.location.end_time})"
+        )
         logger.info("-" * 50)

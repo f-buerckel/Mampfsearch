@@ -6,7 +6,10 @@ from spacy import Language
 from spacy.tokens import Doc
 from mampfsearch.utils import config
 from mampfsearch.utils.models import Relationship, RelationshipCandidate
-from mampfsearch.utils.prompts import RELATIONSHIP_EXTRACTION_PROMPT, RELATIONSHIP_VALIDATION_PROMPT
+from mampfsearch.utils.prompts import (
+    RELATIONSHIP_EXTRACTION_PROMPT,
+    RELATIONSHIP_VALIDATION_PROMPT,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -14,27 +17,30 @@ logger = logging.getLogger(__name__)
 if not Doc.has_extension("rel"):
     Doc.set_extension("rel", default={})
 
+
 @Language.factory(
     "llm_relationship_extraction",
     requires=["doc.ents", "token.ent_kb_id"],
     assigns=["doc._.rel"],
-    )
+)
 class RelationshipExtractionLLM:
     def __init__(self, nlp, name):
-
         self.llm_client = config.get_llm_client()
         self.language = nlp.lang
-        self.max_words_between_entities = config.MAX_WORDS_BETWEEN_ENTITIES_FOR_RELATIONSHIP
-    
-    def __call__(self, doc):
+        self.max_words_between_entities = (
+            config.MAX_WORDS_BETWEEN_ENTITIES_FOR_RELATIONSHIP
+        )
 
+    def __call__(self, doc):
         candidates = self.extract_relationship_candidates(doc)
         relationships = self.extract_relationships(candidates)
         doc = self.set_annotatins(doc, relationships)
-        
+
         return doc
-    
-    def extract_relationships(self, candidates: list[RelationshipCandidate]) -> list[Relationship]:
+
+    def extract_relationships(
+        self, candidates: list[RelationshipCandidate]
+    ) -> list[Relationship]:
         relationships = []
         for candidate in candidates:
             # Check if token level KB IDs are equal. If so they are the same entity and we probably want to skip this relationship.
@@ -55,25 +61,28 @@ class RelationshipExtractionLLM:
                 content = response.choices[0].message.content
                 relationship = self.parse_llm_response(content, candidate)
                 if relationship:
-                    logger.info(f"Extracted relationship: {relationship.entity_1} {relationship.relationship} {relationship.entity_2}")
+                    logger.info(
+                        f"Extracted relationship: {relationship.entity_1} {relationship.relationship} {relationship.entity_2}"
+                    )
                     relationships.append(relationship)
             except Exception as e:
                 logger.error(f"Error during relationship extraction LLM call: {e}")
-        
+
         return relationships
 
     @staticmethod
-    def parse_llm_response(response_content: str, candidate: RelationshipCandidate) -> Relationship | None:
+    def parse_llm_response(
+        response_content: str, candidate: RelationshipCandidate
+    ) -> Relationship | None:
         try:
-
             # Escape backslashes that aren't part of valid JSON escape sequences
             # Valid JSON escapes: \" \\ \/ \b \f \n \r \t \uXXXX
-            response_content = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', response_content)
+            response_content = re.sub(r'\\(?!["\\/bfnrtu])', r"\\\\", response_content)
 
             data = json.loads(response_content)
             reasoning = data.get("reasoning", "")
             relationship = data.get("relationship", "")
-            
+
             if relationship and relationship != "NO_RELATIONSHIP":
                 return Relationship(
                     entity_1=candidate.entity_1,
@@ -84,7 +93,9 @@ class RelationshipExtractionLLM:
                 )
             return None
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}\nContent: {response_content}")
+            logger.error(
+                f"Failed to parse JSON response: {e}\nContent: {response_content}"
+            )
             return None
 
     def extract_relationship_candidates(self, doc) -> list[RelationshipCandidate]:
@@ -92,8 +103,8 @@ class RelationshipExtractionLLM:
         if len(doc.ents) < 2:
             return candidates
         for i, ent1 in enumerate(doc.ents):
-            for ent2 in doc.ents[i+1:]:
-                words_between_entities = doc[ent1.start:ent2.end].text
+            for ent2 in doc.ents[i + 1 :]:
+                words_between_entities = doc[ent1.start : ent2.end].text
                 word_distance = len(words_between_entities.split(" "))
                 if word_distance <= self.max_words_between_entities:
                     candidate = RelationshipCandidate(
@@ -103,7 +114,7 @@ class RelationshipExtractionLLM:
                     )
                     candidates.append(candidate)
         return candidates
-    
+
     @staticmethod
     def set_annotatins(doc, relationships: list[Relationship]):
         for relationship in relationships:

@@ -3,14 +3,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def delete(name):
     client = get_qdrant_client()
     if not client.collection_exists(name):
         logger.warning(f"Collection {name} does not exist")
         return
-    
+
     client.delete_collection(name)
     logger.info(f"Deleted collection {name}")
+
 
 def list():
     client = get_qdrant_client()
@@ -20,15 +22,16 @@ def list():
 
     for collection in collections:
         logger.info(collection.name)
-    
+
     return
+
 
 def get(name):
     client = get_qdrant_client()
     if not client.collection_exists(name):
         logger.warning(f"Collection {name} does not exist")
         return
-    
+
     collection_info = client.get_collection(name)
     model_info = collection_info.config.params.vectors
 
