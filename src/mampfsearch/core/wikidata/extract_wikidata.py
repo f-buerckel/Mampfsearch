@@ -130,6 +130,7 @@ class WikidataMathExtractor:
           (SAMPLE(?rootLabel) AS ?rootLabel) 
           (SAMPLE(?formula) AS ?formula) 
           (SAMPLE(?desc) AS ?desc) 
+          (SAMPLE(?article_en) AS ?wikipedia_url)
         WHERE {{
           VALUES ?rootClass {{
             wd:Q24034552 wd:Q246672 wd:Q114425676 wd:Q65943 wd:Q319141 
@@ -185,12 +186,14 @@ class WikidataMathExtractor:
         for b in raw_bindings:
             root_label = b["rootLabel"]["value"]
             uri = b["item"]["value"]
+            wiki_url = b.get("wikipedia_url", {}).get("value")
 
             entity = {
                 "uri": uri,
                 "name": b["itemLabel"]["value"],
                 "formula": b.get("formula", {}).get("value"),
                 "description": b.get("desc", {}).get("value"),
+                "wikipedia_url": wiki_url,
             }
 
             grouped[root_label].append(entity)

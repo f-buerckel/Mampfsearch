@@ -179,6 +179,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
             e.text = row.name,
             e.formula = row.formula,
             e.description = row.description,
+            e.wikipedia_url = row.wikipedia_url,
             e.source = 'wikidata',
             e.updated_at = datetime()
         """
