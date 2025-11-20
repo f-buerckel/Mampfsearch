@@ -7,7 +7,7 @@ from neo4j.exceptions import Neo4jError
 
 from mampfsearch.utils.models import EntityCandidate
 
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +140,99 @@ class Neo4jGraphStorage(BaseGraphStorage):
         except Neo4jError as e:
             logger.error(f"Failed to fetch relationship id: {e}")
             return None
+
+    def batch_insert_wikidata_concepts(
+        self, concepts: List[Dict[str, Any]], category_label: str
+    ):
+        """
+        Inserts a batch of Wikidata concepts into Neo4j.
+
+        Args:
+            concepts: List of dictionaries. Each dict must contain:
+                      - 'uri': The Wikidata ID (e.g., http://www.wikidata.org/entity/Q123)
+                      - 'name': The English label
+                      Optional: 'formula', 'description'
+            category_label: The specific type from Wikidata (e.g., "Theorem", "Mathematical Structure")
+        """
+        if not concepts:
+            return
+
+        # Sanitize the label (e.g., "mathematical structure" -> "MathematicalStructure")
+        # This prevents Cypher injection.
+        safe_label = "".join(x.title() for x in category_label.split())
+
+        # 2. The Query
+        # We use MERGE on 'id' to ensure we don't duplicate nodes if we run this twice.
+        # We add MULTIPLE labels:
+        #   :Entity (for your app compatibility),
+        #   :Wikidata (for filtering source),
+        #   :<SafeLabel> (specific type)
+
+        cypher = f"""
+        UNWIND $batch AS row
+        MERGE (e:Entity {{id: row.uri}})
+        // Only set created_at if the node is effectively new
+        ON CREATE SET e.created_at = datetime()
+        SET e:Wikidata,
+            e:{safe_label},
+            e.name = row.name,
+            e.text = row.name,
+            e.formula = row.formula,
+            e.description = row.description,
+            e.source = 'wikidata',
+            e.updated_at = datetime()
+        """
+
+        try:
+            # Execute the query
+            self.driver.execute_query(
+                cypher, batch=concepts, database_=self.database_name
+            )
+            logger.info(
+                f"Wikidata Import: Inserted/Updated {len(concepts)} nodes of type ':{safe_label}'"
+            )
+            return True
+
+        except Neo4jError as e:
+            logger.error(f"Failed to batch insert Wikidata entities: {e.message}")
+            return False
+
+    def insert_grouped_relationships(
+        self, rel_type: str, batch: List[Dict[str, str]]
+    ) -> bool:
+        """
+        Inserts a batch of relationships between existing entities.
+        If a source or target entity is missing in Neo4j, the relationship is skipped.
+
+        Args:
+            rel_type: The relationship type string (e.g., "SUBCLASS_OF").
+            batch: List of dicts, where each dict has 'source' and 'target' URIs.
+        """
+        if not batch:
+            return True
+
+        # Sanitize relationship type (allow uppercase, numbers, underscores)
+        # e.g. "SUBCLASS_OF" remains "SUBCLASS_OF"
+        sanitized_rel = re.sub(r"\W+", "_", rel_type).strip("_").upper()
+
+        cypher = f"""
+        UNWIND $batch AS row
+        MATCH (source:Entity {{id: row.source}})
+        MATCH (target:Entity {{id: row.target}})
+        MERGE (source)-[r:{sanitized_rel}]->(target)
+        ON CREATE SET 
+            r.source = 'wikidata',
+            r.created_at = datetime()
+        """
+
+        try:
+            self.driver.execute_query(cypher, batch=batch, database_=self.database_name)
+            logger.info(
+                f"Wikidata Import: Processed {len(batch)} relationships of type '{sanitized_rel}'"
+            )
+            return True
+        except Neo4jError as e:
+            logger.error(
+                f"Failed to batch insert Wikidata relationships ({rel_type}): {e.message}"
+            )
+            return False
