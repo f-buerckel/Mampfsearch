@@ -8,6 +8,9 @@ from typing import Optional
 from spacy.tokens import Doc
 
 from mampfsearch.core.chunking import chunk_file
+
+# import declared as redundant so that linter does not "fix" unused imports
+# needed so that spaCy registers the custom components
 from mampfsearch.core import named_entity_recognition as named_entity_recognition
 from mampfsearch.core import linking as linking
 from mampfsearch.core import relationship_extraction as relationship_extraction
