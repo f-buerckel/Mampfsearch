@@ -1,7 +1,7 @@
 import logging
 
 from mampfsearch.utils import config
-from qdrant_client import models
+from mampfsearch.utils import config
 
 logger = logging.getLogger(__name__)
 
@@ -17,92 +17,14 @@ def init():
 
 
 def create_lectures_collection():
-    client = config.get_qdrant_client()
-
+    client = config.get_vector_storage()
     name = config.LECTURE_COLLECTION_NAME
-    exists = client.collection_exists(name)
-
-    info = {
-        "collection_name": name,
-        "exists": exists,
-    }
-
-    if exists:
-        logger.info(f"Collection {name} already exists")
-        return info
-
     dimension = config.EMBEDDING_DIMENSION
-    client.create_collection(
-        collection_name=name,
-        vectors_config={
-            "dense": models.VectorParams(
-                size=dimension, distance=models.Distance.COSINE
-            ),
-            "colbert": models.VectorParams(
-                size=dimension,
-                distance=models.Distance.COSINE,
-                multivector_config=models.MultiVectorConfig(
-                    comparator=models.MultiVectorComparator.MAX_SIM
-                ),
-            ),
-        },
-        sparse_vectors_config={
-            "sparse": models.SparseVectorParams(index=models.SparseIndexParams())
-        },
-    )
-
-    logger.info(f"Created collection {name} (vector dimension={dimension})")
-
-    info.update(
-        {
-            "status": "exists",
-            "vector_dimension": dimension,
-        }
-    )
-    return info
+    return client.create_lecture_collection(name, dimension)
 
 
 def create_entities_collection():
-    client = config.get_qdrant_client()
-
+    client = config.get_vector_storage()
     name = config.ENTITIES_COLLECTION_NAME
-    exists = client.collection_exists(name)
-
-    info = {
-        "collection_name": name,
-        "exists": exists,
-    }
-
-    if exists:
-        logger.info(f"Collection {name} already exists")
-        return info
-
     dimension = config.EMBEDDING_DIMENSION
-    client.create_collection(
-        collection_name=name,
-        vectors_config={
-            "dense": models.VectorParams(
-                size=dimension, distance=models.Distance.COSINE
-            ),
-            "colbert": models.VectorParams(
-                size=dimension,
-                distance=models.Distance.COSINE,
-                multivector_config=models.MultiVectorConfig(
-                    comparator=models.MultiVectorComparator.MAX_SIM
-                ),
-            ),
-        },
-        sparse_vectors_config={
-            "sparse": models.SparseVectorParams(index=models.SparseIndexParams())
-        },
-    )
-
-    logger.info(f"Created collection {name} (vector dimension={dimension})")
-
-    info.update(
-        {
-            "status": "Created",
-            "vector_dimension": dimension,
-        }
-    )
-    return info
+    return client.create_entity_collection(name, dimension)

@@ -2,11 +2,11 @@ import logging
 import uuid
 
 from typing import List
-from qdrant_client.models import PointStruct
+from typing import List
 
 from mampfsearch.utils import config
 from mampfsearch.utils.models import Chunk
-from mampfsearch.utils import helpers
+from mampfsearch.utils.models import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -50,24 +50,6 @@ def upload(
     payloads: List[dict],
     collection_name: str,
 ):
-    qdrant_client = config.get_qdrant_client()
-
-    for i, embedding in enumerate(vectors):
-        qdrant_client.upsert(
-            collection_name=collection_name,
-            points=[
-                PointStruct(
-                    id=str(uuid.uuid4()),
-                    payload=payloads[i],
-                    vector={
-                        "dense": embedding["dense_vecs"],
-                        "colbert": embedding["colbert_vecs"],
-                        "sparse": helpers.convert_sparse_vector(
-                            embedding["lexical_weights"]
-                        ),
-                    },
-                )
-            ],
-        )
-
+    client = config.get_vector_storage()
+    client.upload_chunks(collection_name, vectors, payloads)
     logger.info(f"Inserted {len(vectors)} vectors into collection {collection_name}")

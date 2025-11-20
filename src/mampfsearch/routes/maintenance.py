@@ -27,13 +27,13 @@ async def initialize_collections():
 @router.get("/status")
 async def get_collection_info():
     """Return status for both lecture and entity collections."""
-    client = config.get_qdrant_client()
+    client = config.get_vector_storage()
 
     def collect_info(name: str):
         exists = client.collection_exists(name)
         info = {"collection_name": name, "exists": exists}
         if exists:
-            col = client.get_collection(name)
+            col = client.get_collection_info(name)
             info.update(
                 {
                     "status": col.status,
@@ -58,7 +58,7 @@ class Collections(str, Enum):
 @router.delete("/delete/{collection}", status_code=204)
 async def delete_collection(collection: Collections):
     """Delete either the lectures or entities collection."""
-    client = config.get_qdrant_client()
+    client = config.get_vector_storage()
     collection_name = (
         config.LECTURE_COLLECTION_NAME
         if collection == Collections.lectures

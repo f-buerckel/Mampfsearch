@@ -66,17 +66,17 @@ def _get_neo4j_graph_storage():
     return storage
 
 
-_qdrant_client = None
+from mampfsearch.core.vector_storage import QdrantVectorStorage
+
+_vector_storage = None
 
 
-def get_qdrant_client():
-    global _qdrant_client
-    if _qdrant_client is None:
-        from qdrant_client import QdrantClient
+def get_vector_storage():
+    global _vector_storage
+    if _vector_storage is None:
+        _vector_storage = QdrantVectorStorage(host=QDRANT_HOST, port=QDRANT_PORT)
 
-        _qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-
-    return _qdrant_client
+    return _vector_storage
 
 
 _async_llm_client = None

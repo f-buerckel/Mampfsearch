@@ -7,7 +7,7 @@ from mampfsearch.utils import config, models
 from mampfsearch.core.extraction_pipeline import extract
 from mampfsearch.retrievers import EntityRetriever
 
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+
 
 router = APIRouter(
     prefix="/graph",
@@ -27,7 +27,7 @@ async def extract_entities_endpoint(
             status_code=400, detail="File does not exist or is not a file."
         )
 
-    client = config.get_qdrant_client()
+    client = config.get_vector_storage()
     if not client.collection_exists(config.ENTITIES_COLLECTION_NAME):
         raise HTTPException(
             status_code=503,
@@ -68,7 +68,7 @@ async def get_all_entities(
         description="Include list of all text variations (aliases) for each entity",
     ),
 ) -> dict:
-    client = config.get_qdrant_client()
+    client = config.get_vector_storage()
 
     if not client.collection_exists(config.ENTITIES_COLLECTION_NAME):
         raise HTTPException(
@@ -76,17 +76,10 @@ async def get_all_entities(
             detail=f"Entity collection '{config.ENTITIES_COLLECTION_NAME}' does not exist.",
         )
 
-    scroll_filter = None
-    if label:
-        scroll_filter = Filter(
-            must=[FieldCondition(key="label", match=MatchValue(value=label))]
-        )
-
-    points, _ = client.scroll(
+    points = client.list_entities(
         collection_name=config.ENTITIES_COLLECTION_NAME,
-        scroll_filter=scroll_filter,
+        label=label,
         limit=limit,
-        with_payload=True,
     )
 
     entities_summary = []

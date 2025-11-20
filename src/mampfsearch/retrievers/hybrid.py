@@ -10,7 +10,7 @@ class HybridRetriever(BaseRetriever):
     ) -> List[LectureRetrievalItem]:
         from qdrant_client import models
 
-        client = config.get_qdrant_client()
+        client = config.get_vector_storage()
         model = config.get_embedding_model()
 
         query_embedding = model.encode(
@@ -34,14 +34,12 @@ class HybridRetriever(BaseRetriever):
             ),
         ]
 
-        points = client.query_points(
-            collection_name=collection_name,
+        points = client.client.query_points(
+            collection_name=config.LECTURE_COLLECTION_NAME,
             prefetch=prefetch,
             query=models.FusionQuery(fusion=models.Fusion.RRF),
             limit=limit,
             with_payload=True,
         )
 
-        return [
-            LectureRetrievalItem.from_qdrant_point(point) for point in points.points
-        ]
+        return [LectureRetrievalItem.from_qdrant_point(point) for point in points.points]

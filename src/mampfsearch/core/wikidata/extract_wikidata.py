@@ -2,15 +2,18 @@ import time
 import logging
 from collections import defaultdict
 from typing import Dict, List, Iterable, Set
+import uuid
 
 from SPARQLWrapper import SPARQLWrapper, JSON, POST
 
 from mampfsearch.utils import config
+from mampfsearch.utils.models import Entity
+from qdrant_client.models import PointStruct
 
 logger = logging.getLogger(__name__)
 
 WIKIDATA_ENDPOINT = "https://query.wikidata.org/sparql"
-BATCH_SIZE = 15000
+BATCH_SIZE = 4000
 REL_CHUNK_SIZE = 500  # Smaller batch size for relationships to avoid URL length limits
 USER_AGENT = "MathKnowledgeGraphBot/1.0 (fbuerckel@mathi.uni-heidelberg.de)"
 
@@ -204,7 +207,41 @@ class WikidataMathExtractor:
             success = self.graph_storage.batch_insert_wikidata_concepts(batch, label)
             if success:
                 total_inserted += len(batch)
+                self._insert_entities_into_vector_store(label, batch)
         return total_inserted
+
+    def _insert_entities_into_vector_store(
+        self, label: str, entities: List[Dict]
+    ) -> None:
+        """
+        Inserts entities into the vector store (Qdrant) with embeddings.
+        """
+        model = config.get_embedding_model()
+        vector_storage = config.get_vector_storage()
+
+        points = []
+        for entity in entities:
+            embedding = model.encode(entity["name"], return_dense=True)
+            entity_model = Entity(
+                name=entity["name"],
+                label=label,
+                uri=entity["uri"],
+                formula=entity.get("formula"),
+                description=entity.get("description"),
+                wikipedia_url=entity.get("wikipedia_url"),
+            )
+            payload = entity_model.model_dump()
+            point = PointStruct(
+                id=str(uuid.uuid4()),
+                payload=payload,
+                vector={"dense": embedding["dense_vecs"]},
+            )
+            points.append(point)
+
+        vector_storage.upsert(
+            collection_name=config.ENTITIES_COLLECTION_NAME,
+            points=points,
+        )
 
     @staticmethod
     def _chunk_uris(uris: Iterable[str], size: int) -> Iterable[List[str]]:

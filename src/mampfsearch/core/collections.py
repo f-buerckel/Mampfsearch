@@ -1,11 +1,11 @@
-from mampfsearch.utils.config import get_qdrant_client
+from mampfsearch.utils.config import get_vector_storage
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 def delete(name):
-    client = get_qdrant_client()
+    client = get_vector_storage()
     if not client.collection_exists(name):
         logger.warning(f"Collection {name} does not exist")
         return
@@ -15,24 +15,23 @@ def delete(name):
 
 
 def list():
-    client = get_qdrant_client()
-    collections = client.get_collections().collections
-
+    client = get_vector_storage()
+    collections = client.list_collections()
     logger.info(f"Found {len(collections)} collections:")
 
     for collection in collections:
-        logger.info(collection.name)
+        logger.info(collection)
 
     return
 
 
 def get(name):
-    client = get_qdrant_client()
+    client = get_vector_storage()
     if not client.collection_exists(name):
         logger.warning(f"Collection {name} does not exist")
         return
 
-    collection_info = client.get_collection(name)
+    collection_info = client.get_collection_info(name)
     model_info = collection_info.config.params.vectors
 
     logger.info(f"Status: {collection_info.status}")

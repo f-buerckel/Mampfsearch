@@ -9,9 +9,27 @@ class BaseGraphStorage(ABC):
     """
 
     @abstractmethod
-    def insert_entity(entity_id: str, entity_candidate: EntityCandidate):
+    def add_entity(self, entity_id: str, entity_candidate: EntityCandidate):
         pass
 
+    @abstractmethod
+    def merge_entity(
+        self, entity_id: str, entity_alias: str, entity_candidate: EntityCandidate
+    ):
+        pass
+
+    @abstractmethod
+    def insert_relationship(
+        self,
+        relationship_id: str,
+        entity_1_id: str,
+        entity_2_id: str,
+        relationship: str,
+        reasoning: Optional[str] = None,
+    ):
+        pass
+
+    @abstractmethod
     def get_relationship_id(
         self,
         entity_1_id: str,

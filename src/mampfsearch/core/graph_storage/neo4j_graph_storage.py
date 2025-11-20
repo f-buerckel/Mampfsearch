@@ -17,7 +17,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.database_name = database_name
 
-    def insert_entity(self, entity_id: str, entity_candidate: EntityCandidate):
+    def add_entity(self, entity_id: str, entity_candidate: EntityCandidate):
         location = entity_candidate.Location
 
         try:
@@ -25,7 +25,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
 
             self.driver.execute_query(
                 """
-                CREATE (e:Entity {
+                CREATE (e:Entity:Lecture {
                     id: $id,
                     name: $name,
                     label: $label,
@@ -57,8 +57,9 @@ class Neo4jGraphStorage(BaseGraphStorage):
             self.driver.execute_query(
                 """
                 MATCH (e:Entity {id: $id})
-                SET e.aliases = e.aliases + $alias,
-                    e.locations = e.locations + $location,
+                SET e:Lecture,
+                    e.aliases = coalesce(e.aliases, []) + $alias,
+                    e.locations = coalesce(e.locations, []) + $location,
                     e.updated_at = datetime()
                 """,
                 id=entity_id,

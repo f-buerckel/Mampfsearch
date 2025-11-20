@@ -48,7 +48,7 @@ class EmbeddingEntityLinker:
                 # New entity - insert immediately
                 logger.info(f"No match found for entity '{ent.text}', inserting now")
                 entity_id = str(uuid.uuid4())
-                self.insert_entity(entity_id, entity_candidate)
+                self.add_entity(entity_id, entity_candidate)
 
             for token in ent:
                 token.ent_kb_id_ = entity_id
@@ -74,15 +74,15 @@ class EmbeddingEntityLinker:
     # that were already present before the extraction run. This fails if the same entities in the same document
     # which is quite common.
     @staticmethod
-    def insert_entity(entity_id: str, entity_candidate: EntityCandidate):
+    def add_entity(entity_id: str, entity_candidate: EntityCandidate):
         """Insert entity into both Qdrant and graph storage immediately"""
         # Insert into Qdrant
         model = config.get_embedding_model()
         embedding = model.encode(entity_candidate.text, return_dense=True)
         payload = Entity.from_entity_candidate(entity_candidate).model_dump()
 
-        qdrant_client = config.get_qdrant_client()
-        qdrant_client.upsert(
+        vector_storage = config.get_vector_storage()
+        vector_storage.upsert(
             collection_name=config.ENTITIES_COLLECTION_NAME,
             points=[
                 PointStruct(
@@ -97,7 +97,7 @@ class EmbeddingEntityLinker:
 
         # Insert into graph storage
         graph_storage = config.get_graph_storage()
-        graph_storage.insert_entity(
+        graph_storage.add_entity(
             entity_id=entity_id, entity_candidate=entity_candidate
         )
 

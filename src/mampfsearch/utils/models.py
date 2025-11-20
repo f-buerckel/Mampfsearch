@@ -101,6 +101,10 @@ class EntityCandidate(BaseModel):
 class Entity(BaseModel):
     name: str
     label: str
+    uri: Optional[str] = None
+    description: Optional[str] = None
+    formula: Optional[str] = None
+    wikipedia_url: Optional[str] = None
     entity_instances: Optional[List[EntityCandidate]] = []
 
     @classmethod
@@ -119,8 +123,12 @@ class EntityRetrievalItem(BaseModel):
 
     @classmethod
     def from_qdrant_point(cls, point):
+        entity = Entity(**point.payload)
+        # If the entity has a URI (from Wikidata), use it as the ID.
+        # Otherwise use the Qdrant point ID (UUID) as original inserted entities use qdrant uuid in graph storage
+        entity_id = entity.uri if entity.uri else str(point.id)
         return cls(
-            id=str(point.id), score=float(point.score), entity=Entity(**point.payload)
+            id=entity_id, score=float(point.score), entity=entity
         )
 
 
