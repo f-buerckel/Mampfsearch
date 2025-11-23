@@ -134,33 +134,39 @@ class WikidataMathExtractor:
           (SAMPLE(?formula) AS ?formula) 
           (SAMPLE(?desc) AS ?desc) 
           (SAMPLE(?article_en) AS ?wikipedia_url)
-        WHERE {{
-          VALUES ?rootClass {{
-            wd:Q24034552 wd:Q246672 wd:Q114425676 wd:Q65943 wd:Q319141 
-            wd:Q748349 wd:Q20026918 wd:Q1936384 wd:Q11348 wd:Q4516355 
-            wd:Q200726 wd:Q122488935
-          }}
+          WHERE {{
+        VALUES ?rootClass {{
+          wd:Q24034552 wd:Q246672 wd:Q114425676 wd:Q65943 wd:Q319141 
+          wd:Q748349 wd:Q20026918 wd:Q1936384 wd:Q11348 wd:Q4516355 
+          wd:Q200726 wd:Q122488935
+                       
+          wd:Q1166618 wd:Q12482 wd:Q217413 wd:Q467606 wd:Q1056428
+          wd:Q82571 wd:Q874429 wd:Q1208658 wd:Q903820 wd:QQ727659
+          wd:Q13220368 wd:Q579978 wd:Q12479 wd:Q613048 wd:Q10843274
+          wd:Q7754 wd:Q854531 wd:Q193756 wd:Q190549 wd:Q876215
+          wd:Q15614122 wd:Q5275326 wd:Q8087 wd:Q15210169 wd:Q180969
+          wd:Q42989 wd:Q212803 wd:Q76592 wd:Q24175351 wd:Q8789
+          wd:Q5862903 wd:Q865811 wd:Q745328 wd:Q44455 wd:Q11216
+          wd:Q141495 wd:Q638328 wd:Q131222
+        }}
           
-          # PATHS
-          {{ ?item wdt:P31|wdt:P279|wdt:P2579 ?rootClass . }}
-          UNION
-          {{ ?item (wdt:P31|wdt:P279|wdt:P2579) / (wdt:P31|wdt:P279|wdt:P2579) ?rootClass . }}
+        ?item (wdt:P31|wdt:P279|wdt:P2579)? / (wdt:P31|wdt:P279|wdt:P2579)? ?rootClass .
           
-          # EXCLUSIONS
-          MINUS {{ ?class wdt:P279* wd:Q11563}}
-          MINUS {{ ?item wdt:P31 wd:Q28920044 }}
-          MINUS {{ ?item wdt:P31 wd:Q133250 }}
-          MINUS {{ ?item wdt:P31 wd:Q29431432 }}
-          
-          # WIKIPEDIA FILTER
-          ?article_en schema:about ?item ;
-                      schema:isPartOf <https://en.wikipedia.org/> .
+        # EXCLUSIONS
+        MINUS {{ ?class wdt:P279* wd:Q11563}}
+        MINUS {{ ?item wdt:P31 wd:Q28920044 }}
+        MINUS {{ ?item wdt:P31 wd:Q133250 }}
+        MINUS {{ ?item wdt:P31 wd:Q29431432 }}
+        
+        # WIKIPEDIA FILTER
+        ?article_en schema:about ?item ;
+                    schema:isPartOf <https://en.wikipedia.org/> .
 
-          # LABELS
-          ?item rdfs:label ?itemLabel . FILTER(LANG(?itemLabel) = "en")
-          ?rootClass rdfs:label ?rootLabel . FILTER(LANG(?rootLabel) = "en")
-          OPTIONAL {{ ?item wdt:P2534 ?formula . }}
-          OPTIONAL {{ ?item schema:description ?desc . FILTER(LANG(?desc) = "en") }}
+        # LABELS
+        ?item rdfs:label ?itemLabel . FILTER(LANG(?itemLabel) = "en")
+        ?rootClass rdfs:label ?rootLabel . FILTER(LANG(?rootLabel) = "en")
+        OPTIONAL {{ ?item wdt:P2534 ?formula . }}
+        OPTIONAL {{ ?item schema:description ?desc . FILTER(LANG(?desc) = "en") }}
         }}
         GROUP BY ?item ?itemLabel
         ORDER BY ?item 
