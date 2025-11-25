@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from mampfsearch.utils.models import EntityCandidate
+from mampfsearch.utils.models import MathEntityCandidate
 from typing import Optional
 
 
@@ -9,12 +9,12 @@ class BaseGraphStorage(ABC):
     """
 
     @abstractmethod
-    def add_entity(self, entity_id: str, entity_candidate: EntityCandidate):
+    def add_entity(self, entity_id: str, entity_candidate: MathEntityCandidate):
         pass
 
     @abstractmethod
     def merge_entity(
-        self, entity_id: str, entity_alias: str, entity_candidate: EntityCandidate
+        self, entity_id: str, entity_alias: str, entity_candidate: MathEntityCandidate
     ):
         pass
 

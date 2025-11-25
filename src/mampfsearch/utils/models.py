@@ -1,7 +1,6 @@
-
 from pydantic import BaseModel, field_serializer, ConfigDict
 from enum import Enum
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Set
 from datetime import timedelta
 from pathlib import Path
 
@@ -9,8 +8,6 @@ from spacy.tokens import Span, Doc
 
 
 class VideoLocation(BaseModel):
-    courseId: str
-    lectureId: str
     start_time: Optional[timedelta] = None
     end_time: Optional[timedelta] = None
 
@@ -29,13 +26,135 @@ class VideoLocation(BaseModel):
 
 
 class FileLocation(BaseModel):
-    courseId: str
-    fileId: str
+    filename: str
+    page_number: Optional[int] = None
+    word_start: Optional[int] = None
+    word_end: Optional[int] = None
 
 
-class Chunk(BaseModel):
+class Segment(BaseModel):
     text: str
-    location: Union[VideoLocation, FileLocation, None] = None
+    location: VideoLocation
+
+
+class Passage(BaseModel):
+    text: str
+    location: FileLocation
+
+
+class Course(BaseModel):
+    name: str
+    description: Optional[str] = None
+    instructor: Optional[str] = None
+
+
+class Lecture(BaseModel):
+    name: str
+    position: int
+    description: Optional[str] = None
+    upload_date: Optional[str] = None
+
+
+class PdfFile(BaseModel):
+    filename: str
+    upload_date: Optional[str] = None
+    description: Optional[str] = None
+
+
+class Topic(BaseModel):
+    name: str
+    uri: Optional[str] = None
+    description: Optional[str] = None
+    wikipedia_url: Optional[str] = None
+
+
+class MathEntityCandidate(BaseModel):
+    """
+    Entity candidates are single extracted entities from a document that may or may not already be in the knowledge base.
+    Entities are already in the knowledge base and contain a unique identifier along every occurrence of the entity across all documents.
+    """
+
+    text: str
+    label: str
+
+
+class MathEntity(BaseModel):
+    name: str
+    uri: Optional[str] = None
+    description: Optional[str] = None
+    formula: Optional[str] = None
+    wikipedia_url: Optional[str] = None
+    entity_instances: Optional[List[MathEntityCandidate]] = []
+
+    @classmethod
+    def from_entity_candidate(cls, entity_candidate):
+        return cls(
+            name=entity_candidate.text.lower(),
+            label=entity_candidate.label,
+            entity_instances=[entity_candidate],
+        )
+
+
+class BaseNode(BaseModel):
+    name: str
+    graph_id: str
+    labels: Set[str]
+
+
+class MathEntityNode(BaseNode):
+    math_entity: MathEntity
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "MathEntity"
+
+
+class TopicNode(BaseNode):
+    topic: Topic
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "Topic"
+
+
+class CourseNode(BaseNode):
+    course: Course
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "Course"
+
+
+class LectureNode(BaseNode):
+    lecture: Lecture
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "Lecture"
+
+
+class PdfFileNode(BaseNode):
+    pdf_file: PdfFile
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "PdfFile"
+
+
+class SegmentNode(BaseNode):
+    segment: Segment
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "Segment"
+
+
+class PassageNode(BaseNode):
+    passage: Passage
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return "Passage"
 
 
 class TranscriptionRequest(BaseModel):
@@ -87,49 +206,18 @@ class LectureRetrievalItem(BaseModel):
         )
 
 
-class EntityCandidate(BaseModel):
-    """
-    Entity candidates are single extracted entities from a document that may or may not already be in the knowledge base.
-    Entities are already in the knowledge base and contain a unique identifier along every occurrence of the entity across all documents.
-    """
-
-    text: str
-    label: str
-    Location: Union[VideoLocation, FileLocation, None] = None
-
-
-class Entity(BaseModel):
-    name: str
-    label: str
-    uri: Optional[str] = None
-    description: Optional[str] = None
-    formula: Optional[str] = None
-    wikipedia_url: Optional[str] = None
-    entity_instances: Optional[List[EntityCandidate]] = []
-
-    @classmethod
-    def from_entity_candidate(cls, entity_candidate):
-        return cls(
-            name=entity_candidate.text.lower(),
-            label=entity_candidate.label,
-            entity_instances=[entity_candidate],
-        )
-
-
 class EntityRetrievalItem(BaseModel):
     id: str
     score: float
-    entity: Entity
+    entity: MathEntity
 
     @classmethod
     def from_qdrant_point(cls, point):
-        entity = Entity(**point.payload)
+        entity = MathEntity(**point.payload)
         # If the entity has a URI (from Wikidata), use it as the ID.
         # Otherwise use the Qdrant point ID (UUID) as original inserted entities use qdrant uuid in graph storage
         entity_id = entity.uri if entity.uri else str(point.id)
-        return cls(
-            id=entity_id, score=float(point.score), entity=entity
-        )
+        return cls(id=entity_id, score=float(point.score), entity=entity)
 
 
 class RelationshipCandidate(BaseModel):

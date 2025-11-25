@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from mampfsearch.utils.models import Chunk, VideoLocation
+from mampfsearch.utils.models import Segment, VideoLocation
 from mampfsearch.core.chunking._helpers import (
     split_subtitle_at_periods,
     merge_until_sentence_complete,
@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 
 def chunk_srt_file(
     srt_file: Path,
-    course_id: str,
-    lecture_id: str,
     min_chunk_size: int = 350,
     max_chunk_size: int = 750,
     overlap: bool = True,
     output_file: Path = None,
-) -> List[Chunk]:
+) -> List[Segment]:
     """
     Chunk an SRT subtitle file into semantically coherent blocks.
 
@@ -37,15 +35,13 @@ def chunk_srt_file(
 
     Args:
         srt_file: Path to the .srt file
-        course_id: Course identifier for metadata
-        lecture_id: Lecture identifier for metadata
         min_chunk_size: Minimum characters per chunk
         max_chunk_size: Maximum characters per chunk
         overlap: If True, add context from adjacent subtitles
         output_file: Optional path to save final SRT for inspection
 
     Returns:
-        List of Chunk objects with VideoLocation metadata
+        List of Segment objects with VideoLocation metadata
 
     Raises:
         ValueError: If max_chunk_size < min_chunk_size or file is not .srt
@@ -80,7 +76,7 @@ def chunk_srt_file(
         _save_srt_file(final_subs, output_file)
 
     # 5. Convert to Chunk models
-    return _subtitles_to_chunks(final_subs, course_id, lecture_id)
+    return _subtitles_to_chunks(final_subs)
 
 
 def _parse_srt_file(file_path: Path) -> List[srt.Subtitle]:
@@ -92,17 +88,13 @@ def _parse_srt_file(file_path: Path) -> List[srt.Subtitle]:
     return srt.parse(content)
 
 
-def _subtitles_to_chunks(
-    subtitles: List[srt.Subtitle], course_id: str, lecture_id: str
-) -> List[Chunk]:
+def _subtitles_to_chunks(subtitles: List[srt.Subtitle]) -> List[Segment]:
     """Convert subtitle objects to Chunk models with VideoLocation."""
     chunks = []
     for sub in subtitles:
-        chunk = Chunk(
+        chunk = Segment(
             text=sub.content.strip(),
             location=VideoLocation(
-                courseId=course_id,
-                lectureId=lecture_id,
                 start_time=sub.start,
                 end_time=sub.end,
             ),

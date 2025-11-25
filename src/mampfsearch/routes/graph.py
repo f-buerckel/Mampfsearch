@@ -8,7 +8,6 @@ from mampfsearch.core.extraction_pipeline import extract
 from mampfsearch.retrievers import EntityRetriever
 
 
-
 router = APIRouter(
     prefix="/graph",
     tags=["Graph"],
@@ -18,8 +17,10 @@ router = APIRouter(
 @router.post("/extract")
 async def extract_entities_endpoint(
     file: Path,
-    course_id: str,
-    lecture_id: Optional[str] = None,
+    course_name: str,
+    lecture_name: str,
+    lecture_position: int,
+    lecture_description: Optional[str] = None,
     background_task: BackgroundTasks = None,
 ):
     if not file.exists() or not file.is_file():
@@ -37,8 +38,10 @@ async def extract_entities_endpoint(
     background_task.add_task(
         extract,
         file_path=Path(file),
-        course_id=course_id,
-        lecture_id=lecture_id,
+        course_name=course_name,
+        lecture_name=lecture_name,
+        lecture_position=lecture_position,
+        lecture_description=lecture_description,
     )
 
     return {"message": "Entity extraction started in background"}

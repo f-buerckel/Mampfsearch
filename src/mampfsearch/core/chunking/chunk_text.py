@@ -6,23 +6,21 @@ from typing import List
 
 from spacy.lang.en import English
 
-from mampfsearch.utils.models import Chunk, FileLocation
+from mampfsearch.utils.models import Passage, FileLocation
 
 logger = logging.getLogger(__name__)
 
 
 def chunk_text_by_sentences(
     text: str,
-    location: FileLocation,
     max_sentences_per_chunk: int = 5,
-) -> List[Chunk]:
+) -> List[Passage]:
     """
     Chunk plain text into groups of sentences.
 
     Args:
         text: The text to chunk
         max_sentences_per_chunk: Maximum sentences per chunk
-        location: Optional location metadata for all chunks
 
     Returns:
         List of Chunk objects
@@ -42,7 +40,7 @@ def chunk_text_by_sentences(
         chunk_sentences = sentences[i : i + max_sentences_per_chunk]
         chunk_text = " ".join(chunk_sentences)
 
-        chunk = Chunk(text=chunk_text, location=location)
+        chunk = Passage(text=chunk_text)
         chunks.append(chunk)
 
     logger.debug(f"Created {len(chunks)} text chunks")
@@ -51,9 +49,8 @@ def chunk_text_by_sentences(
 
 def chunk_text_file(
     file_path: Path,
-    course_id: str,
     max_sentences_per_chunk: int = 5,
-) -> List[Chunk]:
+) -> List[Passage]:
     """
     Read and chunk a plain text file.
 
@@ -69,6 +66,4 @@ def chunk_text_file(
 
     text = file_path.read_text(encoding="utf-8")
 
-    location = FileLocation(courseId=course_id, fileId=file_path.stem)
-
-    return chunk_text_by_sentences(text, location, max_sentences_per_chunk)
+    return chunk_text_by_sentences(text, max_sentences_per_chunk)

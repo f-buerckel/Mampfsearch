@@ -94,11 +94,11 @@ class WikidataMathExtractor:
         self.extract_entities()
 
         if not self._seen_uris:
-            logger.info("No URIs collected; skipping relationship extraction.")
+            logger.info("No URIs collected skipping extraction")
             return
 
         logger.info(
-            "Starting relationship extraction for %d URIs...", len(self._seen_uris)
+            "Starting relationship extraction for %d URIs", len(self._seen_uris)
         )
 
         # 2. Get the Relationships (Chunked to not overwhelm wikidata api)
@@ -210,7 +210,7 @@ class WikidataMathExtractor:
 
         total_inserted = 0
         for label, batch in grouped.items():
-            success = self.graph_storage.batch_insert_wikidata_concepts(batch, label)
+            success = self.graph_storage.insert_wikidata_concepts(batch, label)
             if success:
                 total_inserted += len(batch)
                 self._insert_entities_into_vector_store(label, batch)

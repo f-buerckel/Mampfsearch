@@ -5,7 +5,7 @@ from spacy import Language
 
 from mampfsearch.utils import config
 from mampfsearch.retrievers import EntityRetriever
-from mampfsearch.utils.models import EntityCandidate, Entity
+from mampfsearch.utils.models import MathEntityCandidate, MathEntity, SegmentNode
 from qdrant_client.models import PointStruct
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @Language.factory(
     "embedding_entity_linker",
-    requires=["doc.ents"],
+    requires=["doc.ents", "doc._.segment"],
     assigns=["token.ent_kb_id"],
 )
 class EmbeddingEntityLinker:
@@ -28,11 +28,13 @@ class EmbeddingEntityLinker:
         self.retriever = EntityRetriever()
 
     def __call__(self, doc):
+        segmentNode = doc._.segment
         for ent in doc.ents:
             results = self.retriever.retrieve(ent.text, limit=1)
 
-            entity_candidate = EntityCandidate(
-                text=ent.text, label=ent.label_, Location=doc._.location
+            entity_candidate = MathEntityCandidate(
+                text=ent.text,
+                label=ent.label_,
             )
 
             if results and results[0].score >= self.similarity_threshold:
@@ -42,13 +44,13 @@ class EmbeddingEntityLinker:
                 self.merge_entity(
                     entity_id=entity_id,
                     entity_alias=ent.text,
-                    entity_candidate=entity_candidate,
+                    segmentNode=segmentNode,
                 )
             else:
                 # New entity - insert immediately
                 logger.info(f"No match found for entity '{ent.text}', inserting now")
                 entity_id = str(uuid.uuid4())
-                self.add_entity(entity_id, entity_candidate)
+                self.add_entity(entity_id, entity_candidate, segmentNode)
 
             for token in ent:
                 token.ent_kb_id_ = entity_id
@@ -56,15 +58,13 @@ class EmbeddingEntityLinker:
         return doc
 
     @staticmethod
-    def merge_entity(
-        entity_id: str, entity_alias: str, entity_candidate: EntityCandidate
-    ):
+    def merge_entity(entity_id: str, entity_alias: str, segmentNode: SegmentNode):
         """Merge entity alias and location into graph storage immediately"""
         graph_storage = config.get_graph_storage()
         graph_storage.merge_entity(
             entity_id=entity_id,
             entity_alias=entity_alias,
-            entity_candidate=entity_candidate,
+            segmentNode=segmentNode,
         )
         logger.debug(
             f"Merged entity alias '{entity_alias}' into entity with id '{entity_id}'"
@@ -74,12 +74,14 @@ class EmbeddingEntityLinker:
     # that were already present before the extraction run. This fails if the same entities in the same document
     # which is quite common.
     @staticmethod
-    def add_entity(entity_id: str, entity_candidate: EntityCandidate):
+    def add_entity(
+        entity_id: str, entity_candidate: MathEntityCandidate, segmentNode: SegmentNode
+    ):
         """Insert entity into both Qdrant and graph storage immediately"""
         # Insert into Qdrant
         model = config.get_embedding_model()
         embedding = model.encode(entity_candidate.text, return_dense=True)
-        payload = Entity.from_entity_candidate(entity_candidate).model_dump()
+        payload = MathEntity.from_entity_candidate(entity_candidate).model_dump()
 
         vector_storage = config.get_vector_storage()
         vector_storage.upsert(
@@ -98,7 +100,9 @@ class EmbeddingEntityLinker:
         # Insert into graph storage
         graph_storage = config.get_graph_storage()
         graph_storage.add_entity(
-            entity_id=entity_id, entity_candidate=entity_candidate
+            entity_id=entity_id,
+            entity_candidate=entity_candidate,
+            segmentNode=segmentNode,
         )
 
         logger.debug(f"Inserted entity '{entity_candidate.text}' with id '{entity_id}'")

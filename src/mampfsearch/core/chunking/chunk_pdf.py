@@ -9,27 +9,25 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.datamodel.base_models import InputFormat
 from docling.chunking import HybridChunker
 
-from mampfsearch.utils.models import Chunk, FileLocation
+from mampfsearch.utils.models import Passage, FileLocation
 
 logger = logging.getLogger(__name__)
 
 
 def chunk_pdf_file(
     pdf_file_path: Path,
-    course_id: str,
     enable_formula_enrichment: bool = False,
     max_tokens: int = 312,
-) -> List[Chunk]:
+) -> List[Passage]:
     """
     Extract and chunk text from a PDF file using Docling.
 
     Args:
         pdf_file_path: Path to the PDF file
-        course_id: Course identifier for metadata
         enable_formula_enrichment: If True, apply formula enrichment (experimental)
 
     Returns:
-        List of Chunk objects with FileLocation metadata
+        List of Passage objects with FileLocation metadata
     """
     logger.info(f"Chunking PDF file: {pdf_file_path.name}")
 
@@ -50,9 +48,7 @@ def chunk_pdf_file(
 
     chunk_iter = chunker.chunk(dl_doc=doc)
 
-    file_location = FileLocation(courseId=course_id, fileId=pdf_file_path.stem)
-
-    chunks = [Chunk(text=chunk.text, location=file_location) for chunk in chunk_iter]
+    chunks = [Passage(text=chunk.text) for chunk in chunk_iter]
 
     logger.info(f"Extracted {len(chunks)} chunks from PDF")
     return chunks

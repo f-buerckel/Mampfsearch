@@ -2,17 +2,15 @@ import logging
 import uuid
 
 from typing import List
-from typing import List
 
 from mampfsearch.utils import config
-from mampfsearch.utils.models import Chunk
-from mampfsearch.utils.models import Chunk
+from mampfsearch.utils.models import Segment, Passage
 
 logger = logging.getLogger(__name__)
 
 
 def insert_chunks(
-    chunks: List[Chunk],
+    chunks: List[Segment],
 ):
     vectors, payloads = create_embeddings_and_payloads(chunks)
     upload(vectors, payloads, config.LECTURE_COLLECTION_NAME)
@@ -20,7 +18,7 @@ def insert_chunks(
     return
 
 
-def create_embeddings_and_payloads(chunks: List[Chunk]):
+def create_embeddings_and_payloads(chunks: List[Segment]):
     payloads = []
     vectors = []
 
