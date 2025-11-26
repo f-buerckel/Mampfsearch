@@ -7,7 +7,7 @@ import uuid
 from SPARQLWrapper import SPARQLWrapper, JSON, POST
 
 from mampfsearch.utils import config
-from mampfsearch.utils.models import Entity
+from mampfsearch.utils.models import MathEntity, Topic, TopicNode
 from qdrant_client.models import PointStruct
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,59 @@ class WikidataMathExtractor:
         "http://www.wikidata.org/prop/direct/P31": "INSTANCE_OF",
     }
 
+    ROOT_CLASSES = [
+        "Q24034552",
+        "Q246672",
+        "Q114425676",
+        "Q65943",
+        "Q319141",
+        "Q748349",
+        "Q20026918",
+        "Q1936384",
+        "Q11348",
+        "Q4516355",
+        "Q200726",
+        "Q122488935",
+        "Q1166618",
+        "Q12482",
+        "Q217413",
+        "Q467606",
+        "Q1056428",
+        "Q82571",
+        "Q874429",
+        "Q1208658",
+        "Q903820",
+        "Q727659",
+        "Q13220368",
+        "Q579978",
+        "Q12479",
+        "Q613048",
+        "Q10843274",
+        "Q7754",
+        "Q854531",
+        "Q193756",
+        "Q190549",
+        "Q876215",
+        "Q15614122",
+        "Q5275326",
+        "Q8087",
+        "Q15210169",
+        "Q180969",
+        "Q42989",
+        "Q212803",
+        "Q76592",
+        "Q24175351",
+        "Q8789",
+        "Q5862903",
+        "Q865811",
+        "Q745328",
+        "Q44455",
+        "Q11216",
+        "Q141495",
+        "Q638328",
+        "Q131222",
+    ]
+
     def __init__(
         self,
         endpoint: str = WIKIDATA_ENDPOINT,
@@ -52,15 +105,11 @@ class WikidataMathExtractor:
         self.graph_storage = config.get_graph_storage()
 
         # all extracted entitiy URIs
-        self._seen_uris: Set[str] = set()
-
-    @property
-    def seen_uris(self) -> Set[str]:
-        return self._seen_uris
+        self.seen_uris: Set[str] = set()
 
     def extract_entities(self) -> int:
         """
-        Run the entity extraction + loading, return number of inserted/updated entities.
+        Extract wikidata entities bsaed and insert them into the graph database.
         """
         offset = 0
         total_processed = 0
@@ -68,13 +117,13 @@ class WikidataMathExtractor:
 
         while True:
             logger.info("Fetching batch at offset %d...", offset)
-            raw_bindings = self._fetch_batch(offset)
+            wikidata_result = self._fetch_batch(offset)
 
-            if not raw_bindings:
+            if not wikidata_result:
                 logger.info("No more data returned from Wikidata.")
                 break
 
-            count = self._process_and_load_entities(raw_bindings)
+            count = self._process_and_load_entities(wikidata_result)
             total_processed += count
 
             offset += self.batch_size
@@ -85,27 +134,73 @@ class WikidataMathExtractor:
         )
         return total_processed
 
-    def run_with_relationships(self) -> None:
+    def _get_topics_query(self) -> str:
+        values = " ".join(f"wd:{rc}" for rc in self.ROOT_CLASSES)
+        return f"""
+        SELECT ?rootClass ?rootLabel ?rootDesc ?article_en WHERE {{
+          VALUES ?rootClass {{ {values} }}
+
+          ?rootClass rdfs:label ?rootLabel .
+          FILTER(LANG(?rootLabel) = "en")
+
+          OPTIONAL {{
+            ?rootClass schema:description ?rootDesc .
+            FILTER(LANG(?rootDesc) = "en")
+          }}
+
+          OPTIONAL {{
+            ?article_en schema:about ?rootClass ;
+                        schema:isPartOf <https://en.wikipedia.org/> .
+          }}
+        }}
         """
-        1) Extract + load all entities.
-        2) Use collected URIs to query and load relationships using the Closed World assumption.
+
+    def extract_topics(self) -> None:
+        query = self._get_topics_query()
+        self.sparql.setQuery(query)
+        results = self.sparql.query().convert()
+        topics = results["results"]["bindings"]
+
+        for t in topics:
+            uri = t["rootClass"]["value"]
+            name = t["rootLabel"]["value"]
+            description = t.get("rootDesc", {}).get("value")
+            wikipedia_url = t.get("article_en", {}).get("value")
+
+            topic = Topic(
+                name=name,
+                uri=uri,
+                description=description,
+                wikipedia_url=wikipedia_url,
+            )
+            self.graph_storage.add_topic_node(topic)
+            self.seen_uris.add(uri)
+
+    def extract_and_insert(self) -> None:
         """
-        # 1. Get the Nodes
+        1) Extract and insert all topics
+        2) Extract and insert all entities that are somehow related to topics (rootClassees)
+        3) Partition extracted entities into smaller chunks, then retrieve all relationships of nodes in a chunk and insert them.
+        """
+
+        self.extract_topics()
         self.extract_entities()
 
-        if not self._seen_uris:
+        if not self.seen_uris:
             logger.info("No URIs collected skipping extraction")
             return
 
-        logger.info(
-            "Starting relationship extraction for %d URIs", len(self._seen_uris)
-        )
+        logger.info("Starting relationship extraction for %d URIs", len(self.seen_uris))
 
-        # 2. Get the Relationships (Chunked to not overwhelm wikidata api)
+        # 3. Get the Relationships (Chunked to not overwhelm wikidata api)
         chunk_count = 0
         total_rels = 0
 
-        for chunk in self._chunk_uris(self._seen_uris, size=REL_CHUNK_SIZE):
+        chunks = [
+            self.seen_uris[i : i + REL_CHUNK_SIZE]
+            for i in range(0, len(self.seen_uris), REL_CHUNK_SIZE)
+        ]
+        for chunk in chunks:
             chunk_count += 1
 
             # Fetch raw connections from Wikidata for this chunk
@@ -126,6 +221,7 @@ class WikidataMathExtractor:
 
     def _get_sparql_query(self, limit: int, offset: int) -> str:
         """Build the entity SPARQL query for a single page."""
+        rootClasses = " ".join(f"wd:{rc}" for rc in self.ROOT_CLASSES)
         return f"""
         SELECT 
           ?item 
@@ -136,18 +232,7 @@ class WikidataMathExtractor:
           (SAMPLE(?article_en) AS ?wikipedia_url)
           WHERE {{
         VALUES ?rootClass {{
-          wd:Q24034552 wd:Q246672 wd:Q114425676 wd:Q65943 wd:Q319141 
-          wd:Q748349 wd:Q20026918 wd:Q1936384 wd:Q11348 wd:Q4516355 
-          wd:Q200726 wd:Q122488935
-                       
-          wd:Q1166618 wd:Q12482 wd:Q217413 wd:Q467606 wd:Q1056428
-          wd:Q82571 wd:Q874429 wd:Q1208658 wd:Q903820 wd:QQ727659
-          wd:Q13220368 wd:Q579978 wd:Q12479 wd:Q613048 wd:Q10843274
-          wd:Q7754 wd:Q854531 wd:Q193756 wd:Q190549 wd:Q876215
-          wd:Q15614122 wd:Q5275326 wd:Q8087 wd:Q15210169 wd:Q180969
-          wd:Q42989 wd:Q212803 wd:Q76592 wd:Q24175351 wd:Q8789
-          wd:Q5862903 wd:Q865811 wd:Q745328 wd:Q44455 wd:Q11216
-          wd:Q141495 wd:Q638328 wd:Q131222
+        {rootClasses}
         }}
           
         ?item (wdt:P31|wdt:P279|wdt:P2579)? / (wdt:P31|wdt:P279|wdt:P2579)? ?rootClass .
@@ -186,13 +271,13 @@ class WikidataMathExtractor:
                 logger.warning(
                     "Attempt %d failed at offset %d: %s", attempt + 1, offset, e
                 )
-                time.sleep(2**attempt)
+                time.sleep(2)
         return []
 
-    def _process_and_load_entities(self, raw_bindings: List[Dict]) -> int:
+    def _process_and_load_entities(self, wikidata_result: List[Dict]) -> int:
         grouped: Dict[str, List[Dict]] = defaultdict(list)
 
-        for b in raw_bindings:
+        for b in wikidata_result:
             root_label = b["rootLabel"]["value"]
             uri = b["item"]["value"]
             wiki_url = b.get("wikipedia_url", {}).get("value")
@@ -206,7 +291,7 @@ class WikidataMathExtractor:
             }
 
             grouped[root_label].append(entity)
-            self._seen_uris.add(uri)
+            self.seen_uris.add(uri)
 
         total_inserted = 0
         for label, batch in grouped.items():
@@ -226,9 +311,10 @@ class WikidataMathExtractor:
         vector_storage = config.get_vector_storage()
 
         points = []
+
         for entity in entities:
             embedding = model.encode(entity["name"], return_dense=True)
-            entity_model = Entity(
+            entity_model = MathEntity(
                 name=entity["name"],
                 label=label,
                 uri=entity["uri"],
@@ -248,17 +334,6 @@ class WikidataMathExtractor:
             collection_name=config.ENTITIES_COLLECTION_NAME,
             points=points,
         )
-
-    @staticmethod
-    def _chunk_uris(uris: Iterable[str], size: int) -> Iterable[List[str]]:
-        chunk: List[str] = []
-        for u in uris:
-            chunk.append(u)
-            if len(chunk) >= size:
-                yield chunk
-                chunk = []
-        if chunk:
-            yield chunk
 
     def _get_relationship_query_for_chunk(self, uris: List[str]) -> str:
         """
@@ -289,18 +364,18 @@ class WikidataMathExtractor:
             logger.error(f"Failed to fetch relationships for chunk: {e}")
             return []
 
-    def _process_and_load_relationships(self, raw_bindings: List[Dict]) -> int:
+    def _process_and_load_relationships(self, wikidata_result: List[Dict]) -> int:
         """
         Filters relationships to ensure the TARGET is also in our database,
         then inserts them.
         """
         grouped_rels = defaultdict(list)
 
-        for b in raw_bindings:
+        for b in wikidata_result:
             target_uri = b["target"]["value"]
 
             # Only import if the target is a node we have actually extracted.
-            if target_uri not in self._seen_uris:
+            if target_uri not in self.seen_uris:
                 continue
 
             p_code = b["p"]["value"]
@@ -323,7 +398,7 @@ class WikidataMathExtractor:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     extractor = WikidataMathExtractor()
-    extractor.run_with_relationships()
+    extractor.extract_and_insert()
 
 
 if __name__ == "__main__":
