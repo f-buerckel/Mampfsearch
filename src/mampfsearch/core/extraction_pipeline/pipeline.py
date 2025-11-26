@@ -83,13 +83,14 @@ def extract(
     logger.debug(f"Pipeline problems: {nlp.analyze_pipes()['problems']}")
 
     docs = []
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks):
         segment = Segment(
             text=chunk.text,
             location=chunk.location,
+            position=i,
         )
         segmentNode = graph_storage.add_segment_node(
-            segment=segment, lecture=lectureNode
+            segment=segment, lectureNode=lectureNode
         )
         doc = nlp.make_doc(chunk.text)
         doc._.course = courseNode
