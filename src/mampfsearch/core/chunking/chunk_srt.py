@@ -91,13 +91,14 @@ def _parse_srt_file(file_path: Path) -> List[srt.Subtitle]:
 def _subtitles_to_chunks(subtitles: List[srt.Subtitle]) -> List[Segment]:
     """Convert subtitle objects to Chunk models with VideoLocation."""
     chunks = []
-    for sub in subtitles:
+    for i, sub in enumerate(subtitles):
         chunk = Segment(
             text=sub.content.strip(),
             location=VideoLocation(
                 start_time=sub.start,
                 end_time=sub.end,
             ),
+            position=i,
         )
         chunks.append(chunk)
     return chunks

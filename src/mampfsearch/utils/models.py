@@ -35,11 +35,13 @@ class FileLocation(BaseModel):
 class Segment(BaseModel):
     text: str
     location: VideoLocation
+    position: int
 
 
 class Passage(BaseModel):
     text: str
     location: FileLocation
+    position: int
 
 
 class Course(BaseModel):
