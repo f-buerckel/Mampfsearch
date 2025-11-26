@@ -34,6 +34,26 @@ class Neo4jGraphStorage(BaseGraphStorage):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.database_name = database_name
 
+    def update_global_mention_ratio(self):
+        cypher = """
+        // 1. Calculate total number of entity mentions across the ENTIRE database
+        MATCH ()-[r:MENTIONS_ENTITY]->(:LectureEntity)
+        WITH count(r) as total_global_mentions
+
+        // 2. For each entity, calculate its specific share of that total
+        MATCH (:Segment)-[r:MENTIONS_ENTITY]->(e:LectureEntity)
+        WITH e, count(r) as entity_global_count, total_global_mentions
+
+        // 3. Set the "Background Probability" on the node
+        // e.g., If "Vector" is 1% of all mentions, global_density = 0.01
+        SET e.global_density = toFloat(entity_global_count) / total_global_mentions
+        """
+        self.driver.execute_query(
+            cypher,
+            database_=self.database_name,
+        )
+        logger.info("Updated global mention ratios for all entities.")
+
     def _get_node_properties(
         self,
         node_cls: Optional[Type[BaseNode]],
