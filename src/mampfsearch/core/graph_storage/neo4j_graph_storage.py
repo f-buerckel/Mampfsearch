@@ -20,6 +20,8 @@ from mampfsearch.utils.models import (
     PassageNode,
     Passage,
     BaseNode,
+    Topic,
+    TopicNode,
 )
 
 from typing import Optional, List, Dict, Any, Type
@@ -270,7 +272,9 @@ class Neo4jGraphStorage(BaseGraphStorage):
             logger.error(f"Failed to insert passage node into Neo4j: {e.message}")
             return None
 
-    def add_segment_node(self, segment: Segment, lecture: LectureNode) -> SegmentNode:
+    def add_segment_node(
+        self, segment: Segment, lectureNode: LectureNode
+    ) -> SegmentNode:
         try:
             segment_values = segment.model_dump()
             segment_id = str(uuid.uuid4())
@@ -280,10 +284,17 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 MERGE (s:Segment {id: $id})
                 SET s.name = $params.text,
                     s.text = $params.text,
-                    s.location = $location
+                    s.location = $location,
+                    s.position = $params.position
                 MERGE (l)-[:HAS_SEGMENT]->(s)
+                
+                // create IS_SUCCESSOR relationship
+                WITH l, s
+                MATCH (prev:Segment)<-[:HAS_SEGMENT]-(l)
+                WHERE prev.position = s.position - 1
+                MERGE (prev)-[:IS_SUCCESSOR]->(s)
                 """,
-                lecture_id=lecture.graph_id,
+                lecture_id=lectureNode.graph_id,
                 id=segment_id,
                 params=segment_values,
                 location=json.dumps(segment.location.model_dump())
@@ -303,6 +314,37 @@ class Neo4jGraphStorage(BaseGraphStorage):
             return segmentNode
         except Neo4jError as e:
             logger.error(f"Failed to insert segment node into Neo4j: {e.message}")
+
+    def add_topic_node(self, topic: Topic) -> TopicNode:
+        try:
+            topic_values = topic.model_dump()
+            topic_id = str(topic_values.get("uri", str(uuid.uuid4())))
+
+            self.driver.execute_query(
+                """
+                MERGE (t:Topic {id: $id})
+                SET t.name = $params.name,
+                    t.uri = $params.uri,
+                    t.description = $params.description,
+                    t.wikipedia_url = $params.wikipedia_url
+                """,
+                params=topic_values,
+                id=topic_id,
+                database_=self.database_name,
+            )
+            logger.debug(f"Inserted topic node into Neo4j: {topic_values['name']}")
+
+            topicNode = TopicNode(
+                graph_id=topic_id,
+                name=topic.name,
+                labels={TopicNode.get_identifying_label()},
+                topic=topic,
+            )
+            return topicNode
+
+        except Neo4jError as e:
+            logger.error(f"Failed to insert topic node into Neo4j: {e.message}")
+            return None
 
     def add_entity(
         self,
@@ -343,7 +385,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         try:
             self.driver.execute_query(
                 """
-                MATCH (e:LectureEntity {id: $id})
+                MATCH (e {id: $id})
                 MATCH (s:Segment {id: $segment_id})
                 SET e:LectureEntity,
                     e.aliases = coalesce(e.aliases, []) + $alias,
@@ -507,8 +549,8 @@ class Neo4jGraphStorage(BaseGraphStorage):
 
         cypher = f"""
         UNWIND $batch AS row
-        MATCH (source:Entity {{id: row.source}})
-        MATCH (target:Entity {{id: row.target}})
+        MATCH (source {{id: row.source}})
+        MATCH (target {{id: row.target}})
         MERGE (source)-[r:{sanitized_rel}]->(target)
         ON CREATE SET 
             r.source = 'wikidata',
