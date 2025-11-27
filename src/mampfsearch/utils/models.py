@@ -1,8 +1,9 @@
 from pydantic import BaseModel, field_serializer, ConfigDict
 from enum import Enum
-from typing import List, Dict, Optional, Union, Set
+from typing import List, Dict, Optional, Set
 from datetime import timedelta
 from pathlib import Path
+from mampfsearch.utils.schema import nodeLabels
 
 from spacy.tokens import Span, Doc
 
@@ -87,6 +88,8 @@ class MathEntity(BaseModel):
     formula: Optional[str] = None
     wikipedia_url: Optional[str] = None
     entity_instances: Optional[List[MathEntityCandidate]] = []
+    # number of mentions / total mentions in the kg
+    global_density: Optional[float] = None
 
     @classmethod
     def from_entity_candidate(cls, entity_candidate):
@@ -108,7 +111,7 @@ class MathEntityNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "MathEntity"
+        return nodeLabels["math_entity"]
 
 
 class TopicNode(BaseNode):
@@ -116,7 +119,7 @@ class TopicNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "Topic"
+        return nodeLabels["topic"]
 
 
 class CourseNode(BaseNode):
@@ -124,7 +127,7 @@ class CourseNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "Course"
+        return nodeLabels["course"]
 
 
 class LectureNode(BaseNode):
@@ -132,7 +135,7 @@ class LectureNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "Lecture"
+        return nodeLabels["lecture"]
 
 
 class PdfFileNode(BaseNode):
@@ -140,7 +143,7 @@ class PdfFileNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "PdfFile"
+        return nodeLabels["pdf_file"]
 
 
 class SegmentNode(BaseNode):
@@ -148,7 +151,7 @@ class SegmentNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "Segment"
+        return nodeLabels["segment"]
 
 
 class PassageNode(BaseNode):
@@ -156,7 +159,7 @@ class PassageNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return "Passage"
+        return nodeLabels["passage"]
 
 
 class TranscriptionRequest(BaseModel):

@@ -24,6 +24,7 @@ from mampfsearch.utils.models import (
     TopicNode,
     VideoLocation,
 )
+from mampfsearch.utils.schema import nodeLabels, relationships
 
 from typing import Optional, List, Dict, Any, Type
 
@@ -68,15 +69,15 @@ class Neo4jGraphStorage(BaseGraphStorage):
     def update_global_density(self):
         cypher = f"""
         // 1. Calculate total number of entity mentions across the ENTIRE database
-        MATCH ()-[r:MENTIONS_ENTITY]->(:LectureEntity)
+        MATCH ()-[r:{relationships["mentions_entity"]}]->(:{nodeLabels["lecture_entity"]})
         WITH count(r) as total_global_mentions
 
         // 2. For each entity, calculate its specific share of that total
-        MATCH (:Segment)-[r:MENTIONS_ENTITY]->(e:LectureEntity)
+        MATCH (:{nodeLabels["segment"]})-[r:{relationships["mentions_entity"]}]->(e:{nodeLabels["lecture_entity"]})
         WITH e, count(r) as entity_global_count, total_global_mentions
 
         // 3. Set the "Background Probability" on the node
-        // e.g., If "Vector" is 1% of all mentions, global_density = 0.01
+        // e.g., If "Vector" is 1% of all mentions, global_mention_ratio = 0.01
         SET e.global_density = toFloat(entity_global_count) / total_global_mentions
         """
         self.driver.execute_query(
@@ -243,8 +244,8 @@ class Neo4jGraphStorage(BaseGraphStorage):
             course_id = str(uuid.uuid4())
 
             self.driver.execute_query(
-                """
-                MERGE (c:Course {id: $id})
+                f"""
+                MERGE (c:{nodeLabels["course"]} {{id: $id}})
                 SET c.name = $params.name,
                     c.description = $params.description,
                     c.instructor = $params.instructor
@@ -272,20 +273,20 @@ class Neo4jGraphStorage(BaseGraphStorage):
             lecture_values = lecture.model_dump()
             lecture_id = str(uuid.uuid4())
             self.driver.execute_query(
-                """
-                MATCH (c:Course {id: $course_id})
-                MERGE (l:Lecture {id: $id})
+                f"""
+                MATCH (c:{nodeLabels["course"]} {{id: $course_id}})
+                MERGE (l:{nodeLabels["lecture"]} {{id: $id}})
                 SET l.name = $params.name,
                     l.position = $params.position,
                     l.description = $params.description,
                     l.upload_date = $params.upload_date
-                MERGE (c)-[:HAS_LECTURE]->(l)
+                MERGE (c)-[:{relationships["has_lecture"]}]->(l)
                 
                 // create IS_SUCCESSOR relationship
                 WITH c, l
-                MATCH (prev:Lecture)<-[:HAS_LECTURE]-(c)
+                MATCH (prev:{nodeLabels["lecture"]})<-[:{relationships["has_lecture"]}]-(c)
                 WHERE prev.position = l.position - 1
-                MERGE (prev)-[:IS_SUCCESSOR]->(l)
+                MERGE (prev)-[:{relationships["is_successor"]}]->(l)
                 """,
                 course_id=courseNode.graph_id,
                 id=lecture_id,
@@ -310,13 +311,13 @@ class Neo4jGraphStorage(BaseGraphStorage):
             pdf_id = str(uuid.uuid4())
 
             self.driver.execute_query(
-                """
-                MATCH (c:Course {id: $course_id})
-                MERGE (p:PdfFile {id: $id})
+                f"""
+                MATCH (c:{nodeLabels["course"]} {{id: $course_id}})
+                MERGE (p:{nodeLabels["pdf_file"]} {{id: $id}})
                 SET p.name = $params.name,
                     p.upload_date = $params.upload_date,
                     p.description = $params.description
-                MERGE (c)-[:HAS_PDF_FILE]->(p)
+                MERGE (c)-[:{relationships["has_pfd_file"]}]->(p)
                 """,
                 course_id=course.graph_id,
                 id=pdf_id,
@@ -345,13 +346,13 @@ class Neo4jGraphStorage(BaseGraphStorage):
             passage_id = str(uuid.uuid4())
 
             self.driver.execute_query(
-                """
-                MATCH (p:PdfFile {id: $pdf_file_id})
-                MERGE (pa:Passage {id: $id})
+                f"""
+                MATCH (p:{nodeLabels["pdf_file"]} {{id: $pdf_file_id}})
+                MERGE (pa:{nodeLabels["passage"]} {{id: $id}})
                 SET pa.name = $params.text,
                     pa.text = $params.text,
                     pa.location = $location
-                MERGE (p)-[:HAS_PASSAGE]->(pa)
+                MERGE (p)-[:{relationships["has_passage"]}]->(pa)
                 """,
                 pdf_file_id=pdf_file.graph_id,
                 id=passage_id,
@@ -383,20 +384,20 @@ class Neo4jGraphStorage(BaseGraphStorage):
             segment_values = segment.model_dump()
             segment_id = str(uuid.uuid4())
             self.driver.execute_query(
-                """
-                MATCH (l:Lecture {id: $lecture_id})
-                MERGE (s:Segment {id: $id})
+                f"""
+                MATCH (l:{nodeLabels["lecture"]} {{id: $lecture_id}})
+                MERGE (s:{nodeLabels["segment"]} {{id: $id}})
                 SET s.name = $params.text,
                     s.text = $params.text,
                     s.location = $location,
                     s.position = $params.position
-                MERGE (l)-[:HAS_SEGMENT]->(s)
+                MERGE (l)-[:{relationships["has_segment"]}]->(s)
                 
                 // create IS_SUCCESSOR relationship
                 WITH l, s
-                MATCH (prev:Segment)<-[:HAS_SEGMENT]-(l)
+                MATCH (prev:{nodeLabels["segment"]})<-[:{relationships["has_segment"]}]-(l)
                 WHERE prev.position = s.position - 1
-                MERGE (prev)-[:IS_SUCCESSOR]->(s)
+                MERGE (prev)-[:{relationships["is_successor"]}]->(s)
                 """,
                 lecture_id=lectureNode.graph_id,
                 id=segment_id,
@@ -425,8 +426,8 @@ class Neo4jGraphStorage(BaseGraphStorage):
             topic_id = str(topic_values.get("uri", str(uuid.uuid4())))
 
             self.driver.execute_query(
-                """
-                MERGE (t:Topic {id: $id})
+                f"""
+                MERGE (t:{nodeLabels["topic"]} {{id: $id}})
                 SET t.name = $params.name,
                     t.uri = $params.uri,
                     t.description = $params.description,
@@ -458,18 +459,18 @@ class Neo4jGraphStorage(BaseGraphStorage):
     ):
         try:
             self.driver.execute_query(
-                """
-                CREATE (e:LectureEntity {
+                f"""
+                CREATE (e:{nodeLabels["lecture_entity"]} {{
                     id: $id,
                     name: $name,
                     label: $label,
                     text: $text,
                     aliases: $aliases,
                     created_at: datetime()
-                })
+                }})
                 WITH e
-                Match(s:Segment {id: $segment_id})
-                MERGE (s)-[:MENTIONS_ENTITY]->(e)
+                Match(s:{nodeLabels["segment"]} {{id: $segment_id}})
+                MERGE (s)-[:{relationships["mentions_entity"]}]->(e)
                 """,
                 id=entity_id,
                 name=entity_candidate.text.lower(),
@@ -488,13 +489,13 @@ class Neo4jGraphStorage(BaseGraphStorage):
     def merge_entity(self, entity_id: str, entity_alias: str, segmentNode: SegmentNode):
         try:
             self.driver.execute_query(
-                """
-                MATCH (e {id: $id})
-                MATCH (s:Segment {id: $segment_id})
-                SET e:LectureEntity,
+                f"""
+                MATCH (e {{id: $id}})
+                MATCH (s:{nodeLabels["segment"]} {{id: $segment_id}})
+                SET e:{nodeLabels["lecture_entity"]},
                     e.aliases = coalesce(e.aliases, []) + $alias,
                     e.updated_at = datetime()
-                MERGE (s)-[:MENTIONS_ENTITY]->(e)
+                MERGE (s)-[:{relationships["mentions_entity"]}]->(e)
                 """,
                 id=entity_id,
                 alias=[entity_alias],
@@ -513,12 +514,14 @@ class Neo4jGraphStorage(BaseGraphStorage):
         relationship: str,
         reasoning: Optional[str] = None,
     ):
-        sanitized_relationship = re.sub(r"\W+", "_", relationship or "").strip("_")
+        if relationship not in relationships:
+            logger.warning(f"Relationship '{relationship}' not recognized.")
+            raise ValueError(f"Relationship '{relationship}' not recognized.")
 
         cypher = f"""
-        MATCH (e1:LectureEntity {{id: $entity_1_id}})
-        MATCH (e2:LectureEntity {{id: $entity_2_id}})
-        MERGE (e1)-[r:{sanitized_relationship} {{id: $relationship_id}}]->(e2)
+        MATCH (e1:{nodeLabels["lecture_entity"]} {{id: $entity_1_id}})
+        MATCH (e2:{nodeLabels["lecture_entity"]} {{id: $entity_2_id}})
+        MERGE (e1)-[r:{relationship} {{id: $relationship_id}}]->(e2)
         ON CREATE SET
             r.reasoning = $reasoning,
             r.created_at = datetime()
@@ -536,7 +539,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
             )
             if result and len(result) > 0:
                 logger.debug(
-                    f"Inserted/Merged relationship {sanitized_relationship} "
+                    f"Inserted/Merged relationship {relationship} "
                     f"({relationship_id}) between {entity_1_id} -> {entity_2_id}"
                 )
                 return True
@@ -558,7 +561,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         """Return the relationship id if it exists, else None."""
         sanitized_relationship = re.sub(r"\W+", "_", relationship or "").strip("_")
         cypher = f"""
-        MATCH (:LectureEntity {{id: $entity_1_id}})-[r:{sanitized_relationship}]->(:LectureEntity {{id: $entity_2_id}})
+        MATCH (:{nodeLabels["lecture_entity"]} {{id: $entity_1_id}})-[r:{sanitized_relationship}]->(:{nodeLabels["lecture_entity"]} {{id: $entity_2_id}})
         RETURN r.id AS id
         LIMIT 1
         """
@@ -600,7 +603,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         # We use MERGE on 'id' to ensure we don't duplicate nodes if we run this twice.
         # We add MULTIPLE labels:
         #   :Entity (for your app compatibility),
-        #   :Wikidata (for filtering source),
+        #   :{nodeLabels['wikidata_entity']} (for filtering source),
         #   :<SafeLabel> (specific type)
 
         cypher = f"""
@@ -608,7 +611,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         MERGE (e:Entity {{id: row.uri}})
         // Only set created_at if the node is effectively new
         ON CREATE SET e.created_at = datetime()
-        SET e:Wikidata,
+        SET e:{nodeLabels["wikidata_entity"]},
             e:{safe_label},
             e.name = row.name,
             e.text = row.name,
@@ -669,6 +672,6 @@ class Neo4jGraphStorage(BaseGraphStorage):
             return True
         except Neo4jError as e:
             logger.error(
-                f"Failed to batch insert Wikidata relationships ({rel_type}): {e.message}"
+                f"Failed to batch insert Wikidata relationships (:{rel_type}): {e.message}"
             )
             return False
