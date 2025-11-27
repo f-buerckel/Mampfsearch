@@ -22,6 +22,7 @@ from mampfsearch.utils.models import (
     BaseNode,
     Topic,
     TopicNode,
+    VideoLocation,
 )
 
 from typing import Optional, List, Dict, Any, Type
@@ -34,8 +35,38 @@ class Neo4jGraphStorage(BaseGraphStorage):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.database_name = database_name
 
-    def update_global_mention_ratio(self):
-        cypher = """
+    def get_segments_of_lecture(self, lectureNode: LectureNode) -> List[SegmentNode]:
+        cypher = f"""
+        MATCH (l:{nodeLabels["segment"]} {{id: $lecture_id}})-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})
+        RETURN s, labels(s) AS labels
+        ORDER BY s.position ASC
+        """
+        result, _, _ = self.driver.execute_query(
+            cypher,
+            lecture_id=lectureNode.graph_id,
+            database_=self.database_name,
+        )
+        segmentNodes = []
+        for record in result:
+            props = dict(record["s"])
+            node = SegmentNode(
+                graph_id=props["id"],
+                name=props["name"],
+                labels=set(record.get("labels", [])),
+                segment=Segment(
+                    text=props.get("text"),
+                    location=VideoLocation(
+                        start_time=0, end_time=0
+                    ),  # TODO: Actually fix this
+                    position=props.get("position", 0),
+                ),
+            )
+            segmentNodes.append(node)
+
+        return segmentNodes
+
+    def update_global_density(self):
+        cypher = f"""
         // 1. Calculate total number of entity mentions across the ENTIRE database
         MATCH ()-[r:MENTIONS_ENTITY]->(:LectureEntity)
         WITH count(r) as total_global_mentions
@@ -53,6 +84,59 @@ class Neo4jGraphStorage(BaseGraphStorage):
             database_=self.database_name,
         )
         logger.info("Updated global mention ratios for all entities.")
+
+    def get_local_and_global_density(
+        self, segmentNodes: List[SegmentNode]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Returns:
+            Dict[entity_id, {
+                "local_density": float,
+                "global_density": float
+            }]
+        """
+
+        segment_ids = [node.graph_id for node in segmentNodes]
+
+        cypher = f"""
+        MATCH (s:{nodeLabels["segment"]})-[r:{relationships["mentions_entity"]}]->(e:{nodeLabels["lecture_entity"]})
+        WHERE s.id IN $segment_ids
+        
+        // 1. Count mentions per entity in these segments
+        WITH e, count(r) as local_count
+        
+        // 2. Calculate the TOTAL mentions in these segments
+        // We collect the stats to not lose the information after the aggregation and later unwind to recover
+        WITH collect({{entity: e, count: local_count}}) as stats, sum(local_count) as total_mentions
+        
+        // 3. Unwind and calculate Local Density
+        UNWIND stats as item
+        RETURN item.entity.id AS entity_id, 
+               
+               // Calculate Local Density: (This Entity Count / Total Counts)
+               toFloat(item.count) / total_mentions AS local_density,
+               
+               // Retrieve pre-calculated Global Background Probability
+               coalesce(item.entity.global_mention_ratio, 0.0) AS global_density
+        """
+
+        result, _, _ = self.driver.execute_query(
+            cypher,
+            segment_ids=segment_ids,
+            database_=self.database_name,
+        )
+
+        entity_metrics = {}
+
+        for record in result:
+            entity_id = record["entity_id"]
+
+            entity_metrics[entity_id] = {
+                "local_density": record["local_density"],
+                "global_density": record["global_density"],
+            }
+
+        return entity_metrics
 
     def _get_node_properties(
         self,

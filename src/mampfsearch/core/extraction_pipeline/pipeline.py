@@ -101,4 +101,7 @@ def extract(
     # Proccess chunks in batches like this is usually more efficient, see: https://spacy.io/usage/processing-pipelines#processing
     list(nlp.pipe(docs))
 
+    # update global mention ratios
+    graph_storage.update_global_mention_ratio()
+
     logger.info(f"Extraction pipeline completed for file: {file_path.name}")
