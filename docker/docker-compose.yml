@@ -42,6 +42,7 @@ services:
     container_name: neo4j
     environment:
       - NEO4J_AUTH_FILE=/run/secrets/neo4j_auth_file
+      - NEO4J_PLUGINS='["graph-data-science"]'
     ports:
       - 127.0.0.1:7474:7474
       - 127.0.0.1:7687:7687
