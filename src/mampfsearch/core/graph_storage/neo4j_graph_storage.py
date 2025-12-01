@@ -38,7 +38,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
 
     def get_segments_of_lecture(self, lectureNode: LectureNode) -> List[SegmentNode]:
         cypher = f"""
-        MATCH (l:{nodeLabels["segment"]} {{id: $lecture_id}})-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})
+        MATCH (l:{nodeLabels["lecture"]} {{id: $lecture_id}})-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})
         RETURN s, labels(s) AS labels
         ORDER BY s.position ASC
         """
