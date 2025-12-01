@@ -28,6 +28,5 @@ class QuestionGenerator:
 if __name__ == "__main__":
     graph_storage = config.get_graph_storage()
     qg = QuestionGenerator()
-    lecture = graph_storage.get_lecture_node(name="Lecture3")
-    segmentNodes = graph_storage.get_segments_of_lecture(lecture)
+    segmentNodes = graph_storage.get_segments_of_lecture(lecture_name="Lecture3")
     qg.find_relevant_entities(segmentNodes)

@@ -36,19 +36,42 @@ class Neo4jGraphStorage(BaseGraphStorage):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.database_name = database_name
 
-    def get_segments_of_lecture(self, lectureNode: LectureNode) -> List[SegmentNode]:
+    def get_segments_of_lecture(
+        self,
+        lecture_id: Optional[str] = None,
+        lecture_name: Optional[str] = None,
+    ) -> List[SegmentNode]:
+        if not lecture_id and not lecture_name:
+            raise ValueError("Either 'lecture_id' or 'lecture_name' must be provided")
+
+        where = "l.id = $lecture_id" if lecture_id else "l.name = $lecture_name"
+        params: Dict[str, Any] = (
+            {"lecture_id": lecture_id} if lecture_id else {"lecture_name": lecture_name}
+        )
+
         cypher = f"""
-        MATCH (l:{nodeLabels["lecture"]} {{id: $lecture_id}})-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})
-        RETURN s, labels(s) AS labels
+        MATCH (l:{nodeLabels["lecture"]})
+        WHERE {where}
+        OPTIONAL MATCH (l)-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})
+        WITH l, s, labels(s) AS labels
         ORDER BY s.position ASC
+        RETURN l.id AS lecture_id, s, labels
         """
+
         result, _, _ = self.driver.execute_query(
             cypher,
-            lecture_id=lectureNode.graph_id,
+            **params,
             database_=self.database_name,
         )
-        segmentNodes = []
+
+        # If lecture doesn't exist at all, result will be empty
+        if not result:
+            raise ValueError("Lecture not found")
+
+        segmentNodes: List[SegmentNode] = []
         for record in result:
+            if record["s"] is None:
+                continue  # lecture without segments
             props = dict(record["s"])
             node = SegmentNode(
                 graph_id=props["id"],
@@ -57,14 +80,17 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 segment=Segment(
                     text=props.get("text"),
                     location=VideoLocation(
-                        start_time=0, end_time=0
-                    ),  # TODO: Actually fix this
+                        start_time=0,
+                        end_time=0,
+                    ),  # TODO: decode from props["location"]
                     position=props.get("position", 0),
                 ),
             )
             segmentNodes.append(node)
 
         return segmentNodes
+
+    # ...existing code...
 
     def update_global_density(self):
         cypher = f"""
