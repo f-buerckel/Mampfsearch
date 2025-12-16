@@ -37,30 +37,38 @@ services:
     networks:
       - qdrant-net
 
-  neo4j:
-    image: neo4j:community-bullseye
-    container_name: neo4j
-    environment:
-      - NEO4J_AUTH_FILE=/run/secrets/neo4j_auth_file
-      - NEO4J_PLUGINS=["graph-data-science"]
+  memgraph:
+    image: memgraph/memgraph-mage:latest
+    container_name: memgraph
+    restart: unless-stopped
     ports:
-      - 127.0.0.1:7474:7474
-      - 127.0.0.1:7687:7687
+      - "127.0.0.1:7688:7687"
+      - "127.0.0.1:7444:7444"
+    environment:
+      - MEMGRAPH_USER=${MEMGRAPH_USER}
+      - MEMGRAPH_PASSWORD=${MEMGRAPH_PASSWORD}
+      - MEMGRAPH_LOG_LEVEL=TRACE
     volumes:
-      - neo4j_data:/data
-      - /opt/neo4j/logs:/logs
-      - /opt/neo4j/config:/config
-      - /opt/neo4j/plugins:/plugins
-    restart: always
-    secrets:
-      - neo4j_auth_file
-    networks:
-      - qdrant-net
+      - mg_lib:/var/lib/memgraph
+      - mg_log:/var/log/memgraph
+
+  memgraph-lab:
+    image: memgraph/lab:latest
+    container_name: memgraph-lab
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - QUICK_CONNECT_MG_HOST=memgraph
+      - QUICK_CONNECT_MG_PORT=7687
+    depends_on:
+      - memgraph
 
 
 volumes:
   qdrant_data:
-  neo4j_data:
+  mg_lib:
+  mg_log:
 
 networks:
   qdrant-net:
@@ -69,7 +77,3 @@ configs:
   qdrant_config:
     content: |
       log_level: INFO
-
-secrets:
-  neo4j_auth_file:
-    file: /opt/docker/neo4j/neo4j_auth.txt
