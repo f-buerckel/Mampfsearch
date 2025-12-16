@@ -9,6 +9,8 @@ from neo4j.exceptions import Neo4jError
 
 from mampfsearch.utils.models import (
     MathEntityCandidate,
+    MathEntityNode,
+    MathEntity,
     CourseNode,
     Course,
     LectureNode,
@@ -90,7 +92,68 @@ class Neo4jGraphStorage(BaseGraphStorage):
 
         return segmentNodes
 
-    # ...existing code...
+    def get_segments_of_entity_in_lecture(self, entity_id: str, lecture_id: str):
+        cypher = f"""
+        MATCH (l:{nodeLabels["lecture"]} {{id: $lecture_id}})-[:{relationships["has_segment"]}]->(s:{nodeLabels["segment"]})-[:{relationships["mentions_entity"]}]->(e:{nodeLabels["lecture_entity"]} {{id: $entity_id}})
+        RETURN s, labels(s) AS labels
+        ORDER BY s.position ASC
+        """
+
+        result, _, _ = self.driver.execute_query(
+            cypher,
+            entity_id=entity_id,
+            lecture_id=lecture_id,
+            database_=self.database_name,
+        )
+
+        segmentNodes: List[SegmentNode] = []
+        for record in result:
+            props = dict(record["s"])
+            node = SegmentNode(
+                graph_id=props["id"],
+                name=props["name"],
+                labels=set(record.get("labels", [])),
+                segment=Segment(
+                    text=props.get("text"),
+                    location=VideoLocation(
+                        start_time=0,
+                        end_time=0,
+                    ),
+                ),
+            )
+            segmentNodes.append(node)
+        return segmentNodes
+
+    def get_entities_in_segments(
+        self, segmentNodes: List[SegmentNode]
+    ) -> List[MathEntityNode]:
+        # TODO: Index on segment id to make this more efficient.
+        cypher = f"""
+        MATCH (s:{nodeLabels["segment"]})-[r:{relationships["mentions_entity"]}]->(e:{nodeLabels["math_entity"]})
+        WHERE s.id IN $segment_ids
+        RETURN DISTINCT e, labels(e) AS labels
+        """
+        segment_ids = [node.graph_id for node in segmentNodes]
+        result, _, _ = self.driver.execute_query(
+            cypher,
+            segment_ids=segment_ids,
+            database_=self.database_name,
+        )
+
+        MathEntities = []
+        for record in result:
+            props = dict(record["e"])
+            entity_node = MathEntityNode(
+                graph_id=props["id"],
+                name=props["name"],
+                labels=set(record.get("labels", [])),
+                math_entity=MathEntity(
+                    name=props.get("name"),
+                    label=props.get("label"),
+                ),
+            )
+            MathEntities.append(entity_node)
+        return MathEntities
 
     def update_global_density(self):
         cypher = f"""
@@ -112,14 +175,17 @@ class Neo4jGraphStorage(BaseGraphStorage):
         )
         logger.info("Updated global mention ratios for all entities.")
 
-    def get_local_and_global_density(
+    def get_statistics(
         self, segmentNodes: List[SegmentNode]
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns:
-            Dict[entity_id, {
+            Dict[entity_name, {
+                "entity_id": str,
+                "term_frequency": int,
                 "local_density": float,
-                "global_density": float
+                "global_density": float,
+                "pagerank_score": float
             }]
         """
 
@@ -139,6 +205,11 @@ class Neo4jGraphStorage(BaseGraphStorage):
         // 3. Unwind and calculate Local Density
         UNWIND stats as item
         RETURN item.entity.id AS entity_id, 
+               item.entity.name AS entity_name,
+               item.entity.pagerank_score AS pagerank_score,
+        
+               // Term frequency (total count)
+               toInteger(item.count) AS term_frequency,
                
                // Calculate Local Density: (This Entity Count / Total Counts)
                toFloat(item.count) / total_mentions AS local_density,
@@ -156,14 +227,64 @@ class Neo4jGraphStorage(BaseGraphStorage):
         entity_metrics = {}
 
         for record in result:
-            entity_id = record["entity_id"]
+            entity_name = record["entity_name"]
 
-            entity_metrics[entity_id] = {
+            entity_metrics[entity_name] = {
+                "entity_id": record["entity_id"],
+                "term_frequency": record["term_frequency"],
                 "local_density": record["local_density"],
                 "global_density": record["global_density"],
+                "pagerank_score": record["pagerank_score"],
             }
 
         return entity_metrics
+
+    def update_pagerank(self, max_iterations: int = 20, damping_factor: float = 0.85):
+        cypher = """
+            // create temporary graph
+            CALL gds.graph.project(
+              'temp',
+              '*',
+              {
+                HAS_ENTITY: {
+                  type: 'MENTIONS_ENTITY',
+                  orientation: 'UNDIRECTED'
+                }
+              }
+            )
+            YIELD graphName
+
+            // run pagerank
+            CALL gds.pageRank.write(
+              graphName,
+              {
+                maxIterations: $max_iterations,
+                dampingFactor: $damping_factor,
+                writeProperty: 'pagerank_score'
+              }
+            )
+            YIELD nodePropertiesWritten, ranIterations
+
+            // Drop the graph projection
+            WITH graphName, nodePropertiesWritten, ranIterations
+            CALL gds.graph.drop(graphName)
+            YIELD graphName as droppedGraph
+
+            // Return summary
+            RETURN nodePropertiesWritten, ranIterations, droppedGraph
+        """
+        try:
+            result, _, _ = self.driver.execute_query(
+                cypher,
+                max_iterations=max_iterations,
+                damping_factor=damping_factor,
+                database_=self.database_name,
+            )
+            logger.info(
+                f"Updated PageRank scores for entities: {result[0]['nodePropertiesWritten']} nodes updated in {result[0]['ranIterations']} iterations."
+            )
+        except Neo4jError as e:
+            logger.error(f"Failed to update PageRank scores: {e}")
 
     def _get_node_properties(
         self,

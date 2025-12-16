@@ -31,6 +31,14 @@ ENTITY_EMBED_SIM_THRESHOLD = 0.83
 MAX_WORDS_BETWEEN_ENTITIES_FOR_RELATIONSHIP = 15
 
 
+# Weights for reranking entities for question generation
+SELECTION_WEIGHTS = {
+    "density_ratio": 0.7,
+    "term_frequency": 0.1,
+    "pagerank_score": 0.2,
+}
+
+
 _embedding_model = None
 
 
