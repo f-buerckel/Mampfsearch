@@ -50,7 +50,7 @@ def extract(
     courseNode = graph_storage.get_course_node(name=course_name)
     if courseNode is None:
         course = Course(name=course_name)
-        courseNode = graph_storage.add_course_node(course)
+        graph_storage.add_course_node(course)
 
     lecture = Lecture(
         name=lecture_name,
@@ -58,7 +58,7 @@ def extract(
         description=lecture_description,
     )
 
-    lectureNode = graph_storage.add_lecture_node(lecture=lecture, courseNode=courseNode)
+    graph_storage.add_lecture_node(lecture=lecture, courseNode=courseNode)
 
     chunks = chunk_file(
         file_path=file_path,

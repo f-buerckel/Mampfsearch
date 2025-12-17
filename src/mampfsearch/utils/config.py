@@ -1,4 +1,4 @@
-from mampfsearch.core.graph_storage import Neo4jGraphStorage
+from mampfsearch.core.graph_storage import Neo4jGraphStorage, MemgraphGraphStorage
 from dotenv import load_dotenv
 import logging
 import os
@@ -59,6 +59,9 @@ def get_graph_storage():
     if _graph_storage is None:
         if GRAPH_STORAGE == "neo4j":
             _graph_storage = _get_neo4j_graph_storage()
+        if GRAPH_STORAGE == "memgraph":
+            _graph_storage = _get_memgraph_graph_storage()
+
         else:
             raise ValueError(f"Unknown GRAPH_STORAGE: {GRAPH_STORAGE}")
 
@@ -71,6 +74,16 @@ def _get_neo4j_graph_storage():
         user=os.getenv("NEO4J_USER"),
         password=os.getenv("NEO4J_PASSWORD"),
         database_name=NEO4J_DATABASE_NAME,
+    )
+    return storage
+
+
+def _get_memgraph_graph_storage():
+    storage = MemgraphGraphStorage(
+        host=os.getenv("MEMGRAPH_HOST"),
+        port=int(os.getenv("MEMGRAPH_PORT", "7687")),
+        user=os.getenv("MEMGRAPH_USER"),
+        password=os.getenv("MEMGRAPH_PASSWORD"),
     )
     return storage
 

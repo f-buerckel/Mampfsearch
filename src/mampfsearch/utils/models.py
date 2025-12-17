@@ -1,9 +1,12 @@
-from pydantic import BaseModel, field_serializer, ConfigDict
+from pydantic import BaseModel, field_serializer, ConfigDict, Field
 from enum import Enum
 from typing import List, Dict, Optional, Set
 from datetime import timedelta
 from pathlib import Path
 from mampfsearch.utils.schema import nodeLabels
+
+from gqlalchemy import Node, Relationship
+
 
 from spacy.tokens import Span, Doc
 
@@ -33,42 +36,70 @@ class FileLocation(BaseModel):
     word_end: Optional[int] = None
 
 
-class Segment(BaseModel):
+class Segment(Node):
     text: str
     location: VideoLocation
     position: int
 
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["segment"]
 
-class Passage(BaseModel):
+
+class Passage(Node):
     text: str
     location: FileLocation
     position: int
 
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["passage"]
 
-class Course(BaseModel):
+
+class Course(Node):
     name: str
     description: Optional[str] = None
     instructor: Optional[str] = None
 
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["course"]
 
-class Lecture(BaseModel):
+
+class Lecture(Node):
     name: str
-    position: int
+    position: Optional[int] = None
     description: Optional[str] = None
     upload_date: Optional[str] = None
 
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["lecture"]
 
-class PdfFile(BaseModel):
+
+class HasLecture(Relationship, type="HAS_LECTURE"):
+    pass
+
+
+class PdfFile(Node):
     filename: str
     upload_date: Optional[str] = None
     description: Optional[str] = None
 
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["pdf_file"]
 
-class Topic(BaseModel):
+
+class Topic(Node):
     name: str
     uri: Optional[str] = None
     description: Optional[str] = None
     wikipedia_url: Optional[str] = None
+
+    @classmethod
+    def get_identifying_label(self) -> str:
+        return nodeLabels["topic"]
 
 
 class MathEntityCandidate(BaseModel):
@@ -81,7 +112,7 @@ class MathEntityCandidate(BaseModel):
     label: str
 
 
-class MathEntity(BaseModel):
+class MathEntity(Node):
     name: str
     uri: Optional[str] = None
     description: Optional[str] = None
@@ -99,67 +130,9 @@ class MathEntity(BaseModel):
             entity_instances=[entity_candidate],
         )
 
-
-class BaseNode(BaseModel):
-    name: str
-    graph_id: str
-    labels: Set[str]
-
-
-class MathEntityNode(BaseNode):
-    math_entity: MathEntity
-
     @classmethod
     def get_identifying_label(self) -> str:
         return nodeLabels["math_entity"]
-
-
-class TopicNode(BaseNode):
-    topic: Topic
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["topic"]
-
-
-class CourseNode(BaseNode):
-    course: Course
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["course"]
-
-
-class LectureNode(BaseNode):
-    lecture: Lecture
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["lecture"]
-
-
-class PdfFileNode(BaseNode):
-    pdf_file: PdfFile
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["pdf_file"]
-
-
-class SegmentNode(BaseNode):
-    segment: Segment
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["segment"]
-
-
-class PassageNode(BaseNode):
-    passage: Passage
-
-    @classmethod
-    def get_identifying_label(self) -> str:
-        return nodeLabels["passage"]
 
 
 class TranscriptionRequest(BaseModel):
@@ -226,14 +199,14 @@ class EntityRetrievalItem(BaseModel):
 
 
 class RelationshipCandidate(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)  # Add this line
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     entity_1: Span
     entity_2: Span
     context: Doc
 
 
-class Relationship(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)  # Add this line
+class RelationshipReturn(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     entity_1: Span
     entity_2: Span
     relationship: str

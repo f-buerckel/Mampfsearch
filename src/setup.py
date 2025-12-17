@@ -18,6 +18,8 @@ setup(
         "spacy-llm @ git+https://github.com/f-buerckel/spacy-llm.git@main",
         "langdetect",
         "docling",
+        "pymgclient",
+        "gqlalchemy",
     ],
     entry_points={
         "console_scripts": [
