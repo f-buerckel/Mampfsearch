@@ -85,6 +85,8 @@ class WikidataMathExtractor:
         "Q141495",
         "Q638328",
         "Q131222",
+        "Q170198",  # Series
+        "Q906520",  # divergent series
     ]
 
     def __init__(
