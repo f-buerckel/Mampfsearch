@@ -215,7 +215,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
                toFloat(item.count) / total_mentions AS local_density,
                
                // Retrieve pre-calculated Global Background Probability
-               coalesce(item.entity.global_mention_ratio, 0.0) AS global_density
+               coalesce(item.entity.global_density, 0.0) AS global_density
         """
 
         result, _, _ = self.driver.execute_query(
@@ -382,6 +382,27 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 position=result.get("position"),
                 description=result.get("description"),
                 upload_date=result.get("upload_date"),
+            ),
+        )
+
+    def get_entity_node(
+        self, id: Optional[str] = None, name: Optional[str] = None
+    ) -> Optional[MathEntityNode]:
+        if not id and not name:
+            raise ValueError("Either 'id' or 'name' must be provided")
+
+        result = self._get_node_properties(node_cls=MathEntityNode, id=id, name=name)
+        if not result:
+            logger.warn(f"No entity found for name: {name} or id: {id}")
+            return None
+
+        return MathEntityNode(
+            graph_id=result["id"],
+            name=result["name"],
+            labels=set(result.get("labels", [])),
+            math_entity=MathEntity(
+                name=result.get("name"),
+                label=result.get("label"),
             ),
         )
 
@@ -663,7 +684,6 @@ class Neo4jGraphStorage(BaseGraphStorage):
     ):
         if relationship not in relationships:
             logger.warning(f"Relationship '{relationship}' not recognized.")
-            raise ValueError(f"Relationship '{relationship}' not recognized.")
 
         cypher = f"""
         MATCH (e1:{nodeLabels["lecture_entity"]} {{id: $entity_1_id}})
@@ -822,3 +842,71 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 f"Failed to batch insert Wikidata relationships (:{rel_type}): {e.message}"
             )
             return False
+
+    def get_2hop_context(self):
+        cypher = """
+            MATCH path = (target:Entity)-[r1]->(bridge:Entity)-[r2]->(ref:Entity)
+
+            // 1. Filter: Ensure relationships are semantic (math logic), not system links
+            WHERE NOT type(r1) IN ["MENTIONS_ENTITY", "HAS_SEGMENT", "HAS_LECTURE", "IS_SUCCESSOR"]
+              AND NOT type(r2) IN ["MENTIONS_ENTITY", "HAS_SEGMENT", "HAS_LECTURE", "IS_SUCCESSOR"]
+              
+            // 2. Filter: Ensure distinct nodes (no loops)
+              AND target.id <> ref.id
+              AND target.id <> bridge.id
+
+            // 3. Context Retrieval (Hop 1): Find text connecting Target & Bridge
+            // We look for a segment that mentions BOTH if possible
+            MATCH (s1:Segment)-[:MENTIONS_ENTITY]->(target)
+            WHERE (s1)-[:MENTIONS_ENTITY]->(bridge)
+
+            // 4. Context Retrieval (Hop 2): Find text connecting Bridge & Reference
+            MATCH (s2:Segment)-[:MENTIONS_ENTITY]->(bridge)
+            WHERE (s2)-[:MENTIONS_ENTITY]->(ref) 
+              AND id(s1) <> id(s2) // Ensure we aren't just looking at the exact same sentence twice
+
+            // 5. "Context Challenge": Get text immediately preceding the Reference's segment
+            // This is critical for capturing definitions like "Let x_n = (-1)^n"
+            OPTIONAL MATCH (prev_s2)-[:IS_SUCCESSOR]->(s2)
+
+            RETURN 
+                // The Entities (The Logic)
+                target.name AS target_entity,
+                type(r1) AS rel_1,
+                bridge.name AS bridge_entity,
+                type(r2) AS rel_2,
+                ref.name AS reference_entity,
+
+                // The Evidence (The Text)
+                s1.text AS doc_a,
+                s2.text AS doc_b,
+                prev_s2.text AS doc_b_preceding
+
+            // Limit to ensure diversity
+            ORDER BY rand()
+            LIMIT 20
+        """
+
+        try:
+            result, _, _ = self.driver.execute_query(
+                cypher,
+                database_=self.database_name,
+            )
+            contexts = []
+            for record in result:
+                contexts.append(
+                    {
+                        "target_entity": record["target_entity"],
+                        "rel_1": record["rel_1"],
+                        "bridge_entity": record["bridge_entity"],
+                        "rel_2": record["rel_2"],
+                        "reference_entity": record["reference_entity"],
+                        "doc_a": record["doc_a"],
+                        "doc_b": record["doc_b"],
+                        "doc_b_preceding": record["doc_b_preceding"],
+                    }
+                )
+            return contexts
+        except Neo4jError as e:
+            logger.error(f"Failed to fetch 2-hop contexts: {e}")
+            return []

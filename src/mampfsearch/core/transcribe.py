@@ -63,12 +63,45 @@ def format_timestamp(seconds: float) -> str:
 
 
 def to_srt(segments, output_file="output.srt"):
-    """Convert segments into an SRT file."""
-    with open(output_file, "w", encoding="utf-8") as f:
-        for idx, seg in enumerate(segments, start=1):
-            start, end = seg["timestamp"]
-            text = seg["text"].strip()
+    """Convert segments into an SRT file.
 
-            f.write(f"{idx}\n")
-            f.write(f"{format_timestamp(start)} --> {format_timestamp(end)}\n")
+    Handles missing end timestamps (end=None) by using the next segment start
+    as the end, or falling back to start + fallback_duration_s if no next segment is available.
+    """
+    fallback_duration_s = 1
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        out_idx = 1
+        for i, seg in enumerate(segments or []):
+            start, end = seg.get("timestamp", (None, None))
+            text = (seg.get("text") or "").strip()
+
+            if start is None:
+                logger.warning("Skipping segment with missing start timestamp.")
+                continue
+
+            if end is None:
+                # Prefer next segment start as the end time (keeps subtitles aligned).
+                next_start = None
+                if i + 1 < len(segments or []):
+                    next_start = (segments[i + 1].get("timestamp") or (None, None))[0]
+
+                if next_start is not None and next_start >= start:
+                    end = next_start
+                else:
+                    end = start + fallback_duration_s
+
+                logger.warning(
+                    "Segment missing end timestamp; filled end=%s for start=%s",
+                    end,
+                    start,
+                )
+
+            # Ensure monotonic timestamps
+            if end < start:
+                end = start
+
+            f.write(f"{out_idx}\n")
+            f.write(f"{format_timestamp(float(start))} --> {format_timestamp(float(end))}\n")
             f.write(f"{text}\n\n")
+            out_idx += 1

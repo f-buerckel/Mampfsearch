@@ -246,6 +246,98 @@ Your task is to determine if an extracted relationship represents a general, con
 
 **Respond with only "yes" or "no".**"""
 
+CREATE_FACTUAL_QUESTION_PROMPT = """
+You are an expert mathematician and dataset curator creating a quiz database from university lecture transcripts. 
+
+Your goal is to extract ONE precise, factual question about a specific [Entity] based ONLY on the provided text segment.
+
+The generated question must be **standalone**: it should make sense to a reader who has NOT seen the transcript, while still being answerable from the given segment.
+
+### RULES FOR "VALID" SEGMENTS:
+1. The segment must contain a DEFINITION, a PROPERTY, a THEOREM, or a CONDITION regarding the [Entity].
+2. The information must be self-contained in the text (or clearly implied by immediate context).
+3. IGNORE conversational filler (e.g., "So, um, basically...", "Next slide please", "Is that clear?").
+4. IGNORE meta-commentary (e.g., "We will discuss this later", "This is important for the exam").
+
+### RULES FOR THE QUESTION (CRITICAL):
+1. The question should not depend on the context of the given segment beyond what is explicitly stated in the question itself.
+2. Do NOT use deictic or context-dependent references: avoid "this", "that", "here", "it", "the above", "the following", "we", "our", "in this lecture", "in the slide", etc.
+3. Do NOT ask counterfactual or "replace/if we changed X" questions (e.g., "What would happen if...", "What series would you get if...", "If instead... then...") even if the segment mentions an example like that. Those are NOT stable factual questions.
+  - Exception: general mathematical conditionals that are themselves the stated fact are allowed (e.g., "If $f$ is continuous on [a,b], then ...").
+4. The question must be specific and unambiguous: include all necessary math objects in the question statement (e.g., name the function/series/space explicitly), not by pointing.
+5. The answer must be extractable verbatim (or as a minimal exact paraphrase) from the segment.
+
+### INSTRUCTIONS:
+1. Read the Input Entity and the Transcript Segment.
+2. Determine if the segment contains a hard mathematical fact about the Entity.
+3. If YES: Generate a specific standalone question and the answer found in the text.
+4. If the segment is mostly an informal example, conversational, meta, or would only yield a counterfactual/"replace X" style question: Return nulls.
+
+### OUTPUT FORMAT:
+You must output a single valid JSON object with the following structure:
+{{
+  "reasoning": "Brief explanation of why this segment is valid or invalid",
+  "contains_fact": boolean,
+  "question": "The generated question string OR null",
+  "answer": "The answer derived strictly from text OR null"
+}}
+
+INPUT:
+{{ 
+  "entity": "{entity}",
+  "segment": "{segment}"
+}}
+"""
+CREATE_MULTIPLE_CHOICE_QUESTION_PROMPT = """
+You are an expert mathematician and dataset curator creating a quiz database from university lecture transcripts.
+Your goal is to create a MULTIPLE-CHOICE question based ONLY on the provided text segment about the given entity.
+
+The generated question must be **standalone**: it should make sense to a reader who has NOT seen the transcript, while still being answerable from the given segment.
+
+### RULES FOR "VALID" SEGMENTS:
+1. The segment must contain a DEFINITION, a PROPERTY, a THEOREM, or a CONDITION regarding the [Entity].
+2. The information must be self-contained in the text (or clearly implied by immediate context).
+3. IGNORE conversational filler (e.g., "So, um, basically...", "Next slide please", "Is that clear?").
+4. IGNORE meta-commentary (e.g., "We will discuss this later", "This is important for the exam").
+
+### RULES FOR THE MULTIPLE-CHOICE QUESTION (CRITICAL):
+1. The question should not depend on the context of the given segment beyond what is explicitly stated in the question itself.
+2. Do NOT use deictic or context-dependent references: avoid "this", "that", "here", "it", "the above", "the following", "we", "our", "in this lecture", "in the slide", etc.
+3. Do NOT ask counterfactual or "replace/if we changed X" questions (e.g., "What would happen if...", "What series would you get if...", "If instead... then...") even if the segment mentions an example like that. Those are NOT stable factual questions.
+  - Exception: general mathematical conditionals that are themselves the stated fact are allowed (e.g., "If $f$ is continuous on [a,b], then ...").
+4. The question must be specific and unambiguous: include all necessary math objects in the question statement (e.g., name the function/series/space explicitly), not by pointing.
+5. The correct answer must be extractable verbatim (or as a minimal exact paraphrase) from the segment.
+6. Create THREE plausible distractors (wrong answer choices):
+   - Distractors must be related to the topic but clearly incorrect.
+   - Distractors should be similar in length and complexity to the correct answer.
+   - Avoid using "all of the above", "none of the above", or similar options.
+
+### INSTRUCTIONS:
+1. Read the Input Entity and the Transcript Segment.
+2. Determine if the segment contains a hard mathematical fact about the Entity.
+3. If YES: Generate a specific standalone multiple-choice question, the correct answer found in the text, and FOUR plausible distractors.
+4. If the segment is mostly an informal example, conversational, meta, or would only yield a counterfactual/"replace X" style question: Return nulls.
+
+### OUTPUT FORMAT:
+You must output a single valid JSON object with the following structure:
+{{
+  "reasoning": "Brief explanation of why this segment is valid or invalid",
+  "contains_fact": boolean,
+  "question": "The generated multiple-choice question string",
+  "answer": "The correct answer derived strictly from text",
+  "distractor1": "First plausible wrong answer",
+  "distractor2": "Second plausible wrong answer",
+  "distractor3": "Third plausible wrong answer",
+}}
+or NULL if no valid question can be generated.
+
+INPUT:
+{{ 
+  "entity": "{entity}",
+  "segment": "{segment}",
+}}
+"""
+
 
 FULL_PIPELINE_PROMPT = """You are an expert mathematical NER + relation + property extractor.
 
@@ -449,4 +541,66 @@ Output:
 
 If extraction uncertain -> empty arrays. Output must be valid JSON only.
 Return JSON now.
+"""
+
+CREATE_2HOP_QUESTION_PROMPT = """
+You are an expert mathematician and dataset curator. Your task is to generate a meaningful **2-Hop Question** based on a logical chain from a Knowledge Graph.
+
+The goal is to test if a student understands the connection between a **Target Concept** and a specific **Reference Entity** by identifying the **Bridge Concept** that links them.
+
+### INPUT DATA STRUCTURE:
+You will receive a logical chain:
+1. **Target (Answer)**: The concept the student must identify.
+2. **Bridge**: The intermediate concept that links the Target to the Reference.
+3. **Reference**: The concept, definition, or example used to frame the question.
+4. **Documents**: Text segments verifying these links.
+
+### THE LOGIC (2-HOPS):
+* **Hop 1:** Target is related to Bridge (e.g., "A" *relies on* "B").
+* **Hop 2:** Bridge is related to Reference (e.g., "B" *is a theorem about* "C").
+
+### RULES FOR THE QUESTION:
+1.  **Synthesize, Don't List:** Do not ask "What is related to A and B?". Instead, ask: "What [Target] [Relationship 1] the [Bridge] which [Relationship 2] [Reference]?"
+2.  **Hide the Bridge (Optional):** To increase difficulty, you can describe the Bridge by its properties rather than naming it, forcing the student to infer the connection.
+3.  **Handle Context:** If the Reference is a variable (e.g., "$x_n$") defined only in `doc_b_preceding`, you MUST include that definition in the question stem.
+4.  **Directionality:** The question must clearly ask for the **Target**.
+
+### ONE-SHOT EXAMPLE:
+
+**INPUT:**
+{{
+  "target_entity": "Extreme Value Theorem",
+  "rel_1": "uses in proof",
+  "bridge_entity": "Bolzano-Weierstrass Theorem",
+  "rel_2": "states property of",
+  "reference_entity": "Bounded Sequences",
+  "doc_a": "The Extreme Value Theorem (EVT) is a central result for continuous functions... The proof relies on the Bolzano-Weierstrass Theorem.",
+  "doc_b": "The Bolzano-Weierstrass Theorem states that every bounded sequence of real numbers has at least one convergent subsequence.",
+  "doc_b_preceding": "Recall the definition of a sequence definition."
+}}
+
+**OUTPUT:**
+{{
+  "reasoning": "The chain is valid. Doc A links EVT (Target) to Bolzano-Weierstrass (Bridge). Doc B links Bolzano-Weierstrass to 'Bounded Sequences' (Reference). The logic holds: EVT -> uses -> BW -> is about -> Bounded Sequences. I will construct a question asking for EVT, referencing the property of bounded sequences provided by BW.",
+  "contains_valid_chain": true,
+  "question": "Which theorem relies on the Bolzano-Weierstrass Theorem to guarantee its result, utilizing the fact that every **bounded sequence** has a convergent subsequence?",
+  "answer": "Extreme Value Theorem"
+}}
+
+### INSTRUCTIONS:
+1. Analyze the Chain and Documents. Verify the text supports the relationships.
+2. If `reference_entity` relies on `doc_b_preceding` for its definition, fuse that text into the question.
+3. Generate a JSON response following the example above.
+
+### ACTUAL INPUT:
+{{
+  "target_entity": "{target_entity}",
+  "rel_1": "{rel_1}",
+  "bridge_entity": "{bridge_entity}",
+  "rel_2": "{rel_2}",
+  "reference_entity": "{reference_entity}",
+  "doc_a": "{doc_a}",
+  "doc_b": "{doc_b}",
+  "doc_b_preceding": "{doc_b_preceding}"
+}}
 """

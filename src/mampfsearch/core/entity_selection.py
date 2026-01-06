@@ -3,9 +3,15 @@ from typing import List, Dict, Optional
 from mampfsearch.utils.models import SegmentNode, MathEntityNode
 from mampfsearch.utils.config import get_graph_storage, SELECTION_WEIGHTS
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def find_relevant_entities_in_lecture(
-    lecture_id: Optional[str] = None, lecture_name: Optional[str] = None
+    lecture_id: Optional[str] = None,
+    lecture_name: Optional[str] = None,
+    top_k: Optional[int] = 10,
 ) -> List[MathEntityNode]:
     graph_storage = get_graph_storage()
 
@@ -27,8 +33,24 @@ def find_relevant_entities_in_lecture(
         )
         relevancy[entity_name] = relevance_score
 
-    for name, relevance in dict(
-        sorted(relevancy.items(), key=lambda item: item[1], reverse=True)
-    ).items():
-        print(f"Entity: {name}, Relevance Score: {relevance:.4f}")
-        print(statistics[name])
+    sorted_entities: List[MathEntityNode] = []
+    for name, relevance in sorted(
+        relevancy.items(), key=lambda item: item[1], reverse=True
+    ):
+        entity_stats = statistics.get(name, {})
+        entity_id = entity_stats.get("entity_id")
+        if not entity_id:
+            logger.debug(
+                "Skipping entity '%s' because statistics are missing 'entity_id': %s",
+                name,
+                entity_stats,
+            )
+            continue
+
+        # ugly but works.
+        node = graph_storage.get_entity_node(id=entity_id)
+        sorted_entities.append(node)
+        logger.debug("Entity: %s, Relevance Score: %.4f", name, relevance)
+        logger.debug(entity_stats)
+
+    return sorted_entities[:top_k]

@@ -197,10 +197,12 @@ class WikidataMathExtractor:
         # 3. Get the Relationships (Chunked to not overwhelm wikidata api)
         chunk_count = 0
         total_rels = 0
+        
+        uris = list(self.seen_uris)
 
         chunks = [
-            self.seen_uris[i : i + REL_CHUNK_SIZE]
-            for i in range(0, len(self.seen_uris), REL_CHUNK_SIZE)
+            uris[i : i + REL_CHUNK_SIZE]
+            for i in range(0, len(uris), REL_CHUNK_SIZE)
         ]
         for chunk in chunks:
             chunk_count += 1

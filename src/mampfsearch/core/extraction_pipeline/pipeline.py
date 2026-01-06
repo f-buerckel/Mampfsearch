@@ -102,6 +102,6 @@ def extract(
     list(nlp.pipe(docs))
 
     # update global mention ratios
-    graph_storage.update_global_mention_ratio()
+    graph_storage.update_global_density()
 
     logger.info(f"Extraction pipeline completed for file: {file_path.name}")

@@ -36,7 +36,6 @@ class FileLocation(BaseModel):
 class Segment(BaseModel):
     text: str
     location: VideoLocation
-    position: int
 
 
 class Passage(BaseModel):
@@ -111,7 +110,7 @@ class MathEntityNode(BaseNode):
 
     @classmethod
     def get_identifying_label(self) -> str:
-        return nodeLabels["math_entity"]
+        return nodeLabels["lecture_entity"]
 
 
 class TopicNode(BaseNode):
