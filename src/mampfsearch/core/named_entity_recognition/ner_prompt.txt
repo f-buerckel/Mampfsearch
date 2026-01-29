@@ -28,23 +28,15 @@ Ordering rules (strict and required):
     *   **BAD:** `partition of i`, `dense in r`, `posterior p of x`
     *   **GOOD:** `Partition of a Set`, `Dense Set`, `Posterior Probability`
 
-2.  **No Specific Instances:** Do not extract expressions with specific, placeholder variables. Extract the underlying operation or concept.
-    *   **BAD:** `f + g`, `λf`, `a ∨ ( ¬ a )`
-    *   **GOOD:** `Function Addition`, `Scalar Multiplication of Functions`, `Law of Excluded Middle`
-
-3.  **Concise Naming:** Avoid long descriptive phrases, conjunctions ("or"), or definitions.
+2.  **Concise Naming:** Avoid long descriptive phrases, conjunctions ("or"), or numbered definitions.
     *   **BAD:** `absolute value or modulus of a complex number`
     *   **GOOD:** `Complex Absolute Value`, `Complex Modulus`
 
-4.  **Extract Concepts, Not Properties:** Do not extract phrases describing a property of an object.
-    *   **BAD:** `its own inverse`, `element-wise`
-    *   **GOOD:** `Involution` (if the context implies it), otherwise do not extract anything.
-
-5.  **Avoid Ambiguity:** Do not extract single, ambiguous words. Prefer more specific terms if the context allows.
+3.  **Avoid Ambiguity:** Do not extract single, ambiguous words. Prefer more specific terms if the context allows.
     *   **BAD:** `extension`
     *   **GOOD:** `Field Extension`, `Function Extension`
 
-6.  **Use Names, Not Symbols/Citations:** The entity name should be the descriptive name, not a symbol or a reference number.
+4.  **Use Names, Not Symbols/Citations:** The entity name should be the descriptive name, not a symbol or a reference number.
     *   **BAD:** `π`, `th. 7.29`
     *   **GOOD:** `Pi`, `[Name of Theorem 7.29 if mentioned]`
 

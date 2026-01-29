@@ -604,3 +604,69 @@ You will receive a logical chain:
   "doc_b_preceding": "{doc_b_preceding}"
 }}
 """
+
+
+QUESTION_EVALUATION_PROMPT = """
+### SYSTEM ROLE
+You are a strict Mathematical Pedagogy Evaluator. Your job is to audit a Question-Answer (QA) pair generated from a University-level mathematics lecture transcript. The QA pair was generated based on specific entities found in a Knowledge Graph.
+
+### INPUT DATA
+<Context>
+{context}
+</Context>
+
+<Target_Entity>
+{entity_name}
+</Target_Entity>
+
+<Generated_Question>
+{question}
+</Generated_Question>
+
+<Generated_Answer>
+{answer}
+</Generated_Answer>
+
+### EVALUATION CRITERIA
+Evaluate the QA pair on the following 4 metrics.
+
+**1. Faithfulness (1-5)**
+- Does the Answer rely *only* on the information in the <Context>?
+- Penalize heavily if the Answer uses outside knowledge not present in the lecture (even if mathematically correct), unless it is common knowledge required to understand the language.
+- Score 1 if the answer contradicts the context.
+
+**2. Entity Alignment (1-5)**
+- Is the <Target_Entity> central to the question?
+- A score of 5 means the question tests deep understanding of the {entity_name}.
+- A score of 1 means the entity is mentioned only in passing or not at all.
+
+**3. Mathematical Correctness (1-5)**
+- Is the reasoning in the Answer logically sound?
+- Check for causality errors (e.g., confusing "necessary" vs "sufficient" conditions).
+- Check for notation errors if LaTeX is used.
+
+**4. Pedagogical Utility (1-5)**
+- Is this a useful question for a student studying for an exam?
+- Score 1 for "Trivial text matching" (e.g., "What is the definition of X?" when the text says "X is defined as...").
+- Score 5 for "Synthesis/Application" (e.g., "Given the conditions in the lecture, why does property X hold?").
+
+### EVALUATION STEPS (Chain of Thought)
+1. Read the Context and identify the key mathematical claims regarding {entity_name}.
+2. Analyze the Question: Does it target those claims?
+3. Analyze the Answer: Is it supported by the text? Is the logic valid?
+4. Determine if the question challenges the student or just requires copy-pasting.
+
+### OUTPUT FORMAT
+Provide your response in the following JSON format only:
+
+{{
+  "reasoning_steps": "Detailed analysis of how you reached your conclusion, citing specific phrases from the context.",
+  "scores": {{
+    "faithfulness": <int>,
+    "entity_alignment": <int>,
+    "math_correctness": <int>,
+    "pedagogical_utility": <int>
+  }},
+  "verdict": "<'KEEP' or 'DISCARD'>",
+}}
+"""

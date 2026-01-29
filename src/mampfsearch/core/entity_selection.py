@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from mampfsearch.utils.models import SegmentNode, MathEntityNode
 from mampfsearch.utils.config import get_graph_storage, SELECTION_WEIGHTS
@@ -6,6 +6,18 @@ from mampfsearch.utils.config import get_graph_storage, SELECTION_WEIGHTS
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_entity_relevance(stats: Dict[str, Any]) -> float:
+    density_ratio = stats["local_density"] / stats["global_density"]
+    tf = stats["term_frequency"]
+    pr = stats["pagerank_score"]
+
+    return (
+        SELECTION_WEIGHTS["density_ratio"] * density_ratio
+        + SELECTION_WEIGHTS["term_frequency"] * tf
+        + SELECTION_WEIGHTS["pagerank_score"] * pr
+    )
 
 
 def find_relevant_entities_in_lecture(
@@ -23,14 +35,7 @@ def find_relevant_entities_in_lecture(
 
     statistics = graph_storage.get_statistics(segmentNodes)
     for entity_name, stats in statistics.items():
-        density_ratio = stats["local_density"] / stats["global_density"]
-        tf = stats["term_frequency"]
-        pr = stats["pagerank_score"]
-        relevance_score = (
-            SELECTION_WEIGHTS["density_ratio"] * density_ratio
-            + SELECTION_WEIGHTS["term_frequency"] * tf
-            + SELECTION_WEIGHTS["pagerank_score"] * pr
-        )
+        relevance_score = calculate_entity_relevance(stats)
         relevancy[entity_name] = relevance_score
 
     sorted_entities: List[MathEntityNode] = []

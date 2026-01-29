@@ -1,7 +1,7 @@
 from mampfsearch.utils.config import get_graph_storage, get_llm_client
 from mampfsearch.core.entity_selection import find_relevant_entities_in_lecture
-from mampfsearch.utils.models import SegmentNode
-from mampfsearch.utils import prompts
+from mampfsearch.utils.models import SegmentNode, MathEntity
+from mampfsearch.utils import prompts, config
 from typing import List, Optional, Dict
 
 import re
@@ -118,3 +118,66 @@ def create_multiple_choice_question(segments: List[SegmentNode], entity_name: st
             continue
 
     return questions
+
+
+def evaluate_question(
+    context: str,
+    question: str,
+    answer: str,
+    entities: List[MathEntity],
+    entity_name: str,
+):
+    similarity = similarity_to_context(context, question)
+
+    llm_score = evaluate_question_with_llm(
+        context=context, question=question, answer=answer, entity_name=entity_name
+    )
+
+    return llm_score
+
+
+def evaluate_question_with_llm(
+    context: str, question: str, answer: str, entity_name: str
+) -> float:
+    llm_client = get_llm_client()
+    prompt = prompts.QUESTION_EVALUATION_PROMPT.format(
+        context=context, entity_name=entity_name, question=question, answer=answer
+    )
+
+    try:
+        response = llm_client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt,
+                },
+            ],
+        )
+        response = response.choices[0].message.content
+        response_dict = parse_llm_response(
+            response=response,
+            keys=("clarity", "relevance", "math_correctness", "pedagogical_utility"),
+        )
+        if response_dict:
+            scores = {key: int(response_dict[key]) for key in response_dict.keys()}
+
+            # return the average score:
+            return sum(scores.values()) / len(scores)
+
+        else:
+            logger.debug("LLM response did not contain all required evaluation keys.")
+            return 0.0
+
+    except Exception as e:
+        logger.error(f"Error during question evaluation LLM call: {e}")
+        return {}
+
+
+def similarity_to_context(context: str, question: str):
+    model = config.get_embedding_model()
+    context_embedding = model.encode(context, return_dense=True)
+    question_embedding = model.encode(question, return_dense=True)
+    similarity = context_embedding @ question_embedding.T
+
+    return similarity

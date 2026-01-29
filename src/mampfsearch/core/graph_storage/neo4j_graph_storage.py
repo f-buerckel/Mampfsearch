@@ -551,6 +551,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
         try:
             segment_values = segment.model_dump()
             segment_id = str(uuid.uuid4())
+            # TODO: Position is borken and null
             self.driver.execute_query(
                 f"""
                 MATCH (l:{nodeLabels["lecture"]} {{id: $lecture_id}})

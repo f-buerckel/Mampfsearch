@@ -36,6 +36,7 @@ class FileLocation(BaseModel):
 class Segment(BaseModel):
     text: str
     location: VideoLocation
+    position: int
 
 
 class Passage(BaseModel):

@@ -31,8 +31,15 @@ class RelationshipExtractionLLM:
         )
 
     def __call__(self, doc):
+        logger.info(
+            f"Starting relationship extraction for doc with text length: {len(doc.text)}"
+        )
         candidates = self.extract_relationship_candidates(doc)
+        logger.info(
+            f"Identified {len(candidates)} candidate pairs for relationship extraction."
+        )
         relationships = self.extract_relationships(candidates)
+        logger.info(f"Finalized extraction: Found {len(relationships)} relationships.")
         doc = self.set_annotatins(doc, relationships)
 
         return doc
@@ -44,6 +51,9 @@ class RelationshipExtractionLLM:
         for candidate in candidates:
             # Check if token level KB IDs are equal. If so they are the same entity and we probably want to skip this relationship.
             if candidate.entity_1[0].ent_kb_id_ == candidate.entity_2[0].ent_kb_id_:
+                logger.debug(
+                    f"Skipping candidate {candidate.entity_1.text} <-> {candidate.entity_2.text} as they refer to the same entity."
+                )
                 continue  # Skip if both entities link to the same KB ID
             prompt = RELATIONSHIP_EXTRACTION_PROMPT.format(
                 entity1=candidate.entity_1.text,
