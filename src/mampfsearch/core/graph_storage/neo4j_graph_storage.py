@@ -86,6 +86,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
                         end_time=0,
                     ),  # TODO: decode from props["location"]
                     position=props.get("position", 0),
+                    about_entity=props.get("about_entity"),
                 ),
             )
             segmentNodes.append(node)
@@ -119,6 +120,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
                         start_time=0,
                         end_time=0,
                     ),
+                    about_entity=props.get("about_entity"),
                 ),
             )
             segmentNodes.append(node)
@@ -150,6 +152,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 math_entity=MathEntity(
                     name=props.get("name"),
                     label=props.get("label"),
+                    description=props.get("description"),
                 ),
             )
             MathEntities.append(entity_node)

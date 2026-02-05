@@ -1,5 +1,5 @@
 nodeLabels = {
-    "math_entity": "MathEntity",
+    "math_entity": "Entity",
     "wikidata_entity": "WikidataEntity",
     "lecture_entity": "LectureEntity",
     "segment": "Segment",

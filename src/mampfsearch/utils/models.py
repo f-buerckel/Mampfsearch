@@ -37,6 +37,7 @@ class Segment(BaseModel):
     text: str
     location: VideoLocation
     position: int
+    about_entity: Optional[str] = None
 
 
 class Passage(BaseModel):

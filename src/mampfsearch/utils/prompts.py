@@ -339,6 +339,61 @@ INPUT:
 """
 
 
+CREATE_SPANNING_QUESTION_PROMPT = """
+You are an expert mathematician creating an assessment question for a lecture summary.
+Your goal is to test whether a student understood the specific logical flow, motivations, or definitions presented in the provided text about "{entity}".
+
+**Strict Content Boundaries**:
+1.  **Source Truth**: You must generate the question and answer based **ONLY** on the information, examples, and logic explicitly present in the "Context".
+2.  **No Outside Knowledge**: Do NOT ask for proofs, calculations, or definitions that are far outside the scope of this specific text. (e.g., If the text mentions "Banach spaces exist" but doesn't define the norm properties, do not ask the student to prove the triangle inequality).
+
+**Phrasing Constraints**:
+1.  Do NOT refer to "the text provided", "the passage", or "the snippet".
+2.  Instead, use natural phrasing like "In the lecture...", "According to the discussion on {entity}...", or "As explained regarding..."
+3.  The question must be standalone.
+
+**Mathematical Formatting**:
+-   ALWAYS use valid LaTeX for mathematical symbols and equations (e.g., `\\mathbb{{R}}`, `\\epsilon > 0`).
+-   Do NOT use Unicode math characters (use `\\in` not `∈`).
+
+Context:
+{context}
+
+Return the output in the following JSON format:
+{{
+    "question": "The question text",
+    "answer": "The correct answer",
+    "explanation": "A brief explanation citing the logic found in the text."
+}}
+"""
+
+CREATE_UNSTRUCTURED_QUESTION_PROMPT = """
+You are an expert mathematician creating an assessment question for a lecture summary.
+Your goal is to test whether a student understood the specific logical flow, motivations, or definitions presented in the provided text about {entity} by generating {n_questions} questions.
+
+**Strict Content Boundaries**:
+1.  **Source Truth**: You must generate the question and answer based **ONLY** on the information, examples, and logic explicitly present in the lecture.
+2.  **No Outside Knowledge**: Do NOT ask for proofs, calculations, or definitions that are far outside the scope of this specific text. (e.g., If the text mentions "Banach spaces exist" but doesn't define the norm properties, do not ask the student to prove the triangle inequality).
+
+**Phrasing Constraints**:
+1.  Do NOT refer to "the text provided", "the passage", or "the snippet".
+2.  Instead, use natural phrasing like "In the lecture...", "According to the discussion on {entity}...", or "As explained regarding..."
+3.  The question must be standalone.
+
+**Mathematical Formatting**:
+-   ALWAYS use valid LaTeX for mathematical symbols and equations (e.g., `\\mathbb{{R}}`, `\\epsilon > 0`).
+-   Do NOT use Unicode math characters (use `\\in` not `∈`).
+
+Context:
+{context}
+
+Return the output in the following JSON format:
+{{
+    "questions": ['The first question text', 'The second question text', ... 'Question {n_questions} text'],
+    "answers": ['Answer to first question', 'Answer to second question', ... 'Answer to question {n_questions}'],
+}}
+"""
+
 FULL_PIPELINE_PROMPT = """You are an expert mathematical NER + relation + property extractor.
 
 Input JSON:
@@ -661,12 +716,10 @@ Provide your response in the following JSON format only:
 
 {{
   "reasoning_steps": "Detailed analysis of how you reached your conclusion, citing specific phrases from the context.",
-  "scores": {{
-    "faithfulness": <int>,
-    "entity_alignment": <int>,
-    "math_correctness": <int>,
-    "pedagogical_utility": <int>
-  }},
+  "faithfulness": <int>,
+  "entity_alignment": <int>,
+  "math_correctness": <int>,
+  "pedagogical_utility": <int>
   "verdict": "<'KEEP' or 'DISCARD'>",
 }}
 """
