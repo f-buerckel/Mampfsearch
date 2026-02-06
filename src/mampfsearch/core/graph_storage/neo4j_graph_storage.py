@@ -28,7 +28,7 @@ from mampfsearch.utils.models import (
 )
 from mampfsearch.utils.schema import nodeLabels, relationships
 
-from typing import Optional, List, Dict, Any, Type
+from typing import Optional, List, Dict, Any, Type, Set
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +131,9 @@ class Neo4jGraphStorage(BaseGraphStorage):
     ) -> List[MathEntityNode]:
         # TODO: Index on segment id to make this more efficient.
         cypher = f"""
-        MATCH (s:{nodeLabels["segment"]})-[r:{relationships["mentions_entity"]}]->(e:{nodeLabels["math_entity"]})
+        MATCH (s:{nodeLabels["segment"]})-[r:{relationships["mentions_entity"]}]->(e)
         WHERE s.id IN $segment_ids
+          AND (e:{nodeLabels["math_entity"]} OR e:{nodeLabels["lecture_entity"]})
         RETURN DISTINCT e, labels(e) AS labels
         """
         segment_ids = [node.graph_id for node in segmentNodes]
@@ -157,6 +158,40 @@ class Neo4jGraphStorage(BaseGraphStorage):
             )
             MathEntities.append(entity_node)
         return MathEntities
+
+    def get_entity_mentions_for_segments(
+        self, segment_ids: List[str]
+    ) -> Dict[str, Set[str]]:
+        """Return a mapping: segment_id -> set of mentioned entity names (lowercased).
+
+        This is used for efficient co-mention retrieval in question generation.
+        """
+
+        if not segment_ids:
+            return {}
+
+        cypher = f"""
+        MATCH (s:{nodeLabels["segment"]})
+        WHERE s.id IN $segment_ids
+        OPTIONAL MATCH (s)-[:{relationships["mentions_entity"]}]->(e)
+        WHERE (e:{nodeLabels["math_entity"]} OR e:{nodeLabels["lecture_entity"]})
+        WITH s, collect(DISTINCT toLower(coalesce(e.name, ''))) AS names
+        RETURN s.id AS segment_id, [n IN names WHERE n <> ''] AS names
+        """
+
+        result, _, _ = self.driver.execute_query(
+            cypher,
+            segment_ids=segment_ids,
+            database_=self.database_name,
+        )
+
+        mapping: Dict[str, Set[str]] = {}
+        for record in result:
+            seg_id = record.get("segment_id")
+            names = record.get("names") or []
+            if seg_id:
+                mapping[seg_id] = set(names)
+        return mapping
 
     def update_global_density(self):
         cypher = f"""

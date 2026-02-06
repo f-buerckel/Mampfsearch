@@ -1,0 +1,2 @@
+csv_a,csv_b,name_a,name_b,n_pairs,match_on,seed,model,temperature,max_tokens,context_words,wins_a,wins_b,ties,invalid
+Results/Lecture21/gpt-oss-5-feb/generated_multi_questions_21.csv,Results/Lecture21/gpt-oss-5-feb/generated_unstructured_questions.csv,multi,unstructured,200,none,0,openai/gpt-oss-20b,0.0,100000,1200,171,17,12,0

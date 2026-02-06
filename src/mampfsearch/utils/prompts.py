@@ -341,7 +341,7 @@ INPUT:
 
 CREATE_SPANNING_QUESTION_PROMPT = """
 You are an expert mathematician creating an assessment question for a lecture summary.
-Your goal is to test whether a student understood the specific logical flow, motivations, or definitions presented in the provided text about "{entity}".
+Your goal is to test whether a student understood the specific logical flow, motivations, or definitions presented in the provided text about "{entity}" by generating {n_questions} questions.
 
 **Strict Content Boundaries**:
 1.  **Source Truth**: You must generate the question and answer based **ONLY** on the information, examples, and logic explicitly present in the "Context".
@@ -361,9 +361,50 @@ Context:
 
 Return the output in the following JSON format:
 {{
-    "question": "The question text",
-    "answer": "The correct answer",
-    "explanation": "A brief explanation citing the logic found in the text."
+  "questions": ["The first question text", "The second question text", "..."],
+  "answers": ["Answer to the first question", "Answer to the second question", "..."],
+  "explanations": ["Brief explanation for Q1", "Brief explanation for Q2", "..."]
+}}
+"""
+
+
+CREATE_MULTI_ENTITY_SPANNING_QUESTION_PROMPT = """
+You are an expert mathematician creating assessment questions for a lecture.
+Your goal is to test whether a student can reason about "{entity}" *together with other mathematical entities* mentioned in the lecture by generating up to {n_questions} questions.
+
+**Strict Content Boundaries**:
+1. **Source Truth**: You must generate the question and answer based **ONLY** on the information, examples, and logic explicitly present in the "Context".
+2. **No Outside Knowledge**: Do NOT ask for proofs, calculations, or definitions that are far outside the scope of the provided context.
+
+**Multi-Entity Reasoning Requirement**:
+1. Each question MUST involve "{entity}" and if somehow possible at least ONE additional entity from: {other_entities}.
+2. The question must require reasoning across entities (e.g., connecting a definition of one entity to a property/usage of another), not mere mention.
+3. If possible, create questions that combine multiple concepts mentioned to test deeper understanding and generate questions that require deeper reasoning across the text, not just simple fact recall.
+
+
+**Context Structure (IMPORTANT)**:
+- The context is separated into multiple blocks (e.g., Main Text, Related Entity Descriptions, Definition Context, Co-mention Context).
+- These blocks are **separate evidence sources** and may be from different parts of the lecture.
+- Do NOT assume the blocks are consecutive in the lecture.
+- Do NOT refer to block names ("Main Text", "Definition Context", etc.) in the question.
+
+**Phrasing Constraints**:
+1. Do NOT refer to "the text provided", "the passage", or "the snippet".
+2. Use natural phrasing like "In the lecture...", "As discussed...", or "According to the discussion on ...".
+3. The question must be standalone.
+
+**Mathematical Formatting**:
+- ALWAYS use valid LaTeX for mathematical symbols and equations (e.g., `\\mathbb{{R}}`, `\\epsilon > 0`).
+- Do NOT use Unicode math characters (use `\\in` not `∈`).
+
+Context:
+{context}
+
+Return the output in the following JSON format:
+{{
+  "questions": ["..."],
+  "answers": ["..."],
+  "explanations": ["..."]
 }}
 """
 
@@ -391,6 +432,102 @@ Return the output in the following JSON format:
 {{
     "questions": ['The first question text', 'The second question text', ... 'Question {n_questions} text'],
     "answers": ['Answer to first question', 'Answer to second question', ... 'Answer to question {n_questions}'],
+}}
+"""
+
+CREATE_UNSTRUCTURED_QUESTION_PROMPT_NO_ENTITY = """
+You are an expert mathematician creating assessment questions for a lecture.
+Your goal is to test whether a student understood the specific logical flow, motivations, or definitions presented in the provided lecture excerpt by generating up to {n_questions} questions.
+If possible, create questions that combine multiple concepts mentioned to test deeper understanding and generate questions that require deeper reasoning across the text, not just simple fact recall.
+
+
+**Strict Content Boundaries**:
+1.  **Source Truth**: You must generate the questions and answers based **ONLY** on the information, examples, and logic explicitly present in the lecture excerpt.
+2.  **No Outside Knowledge**: Do NOT ask for proofs, calculations, or definitions that are far outside the scope of this specific excerpt.
+
+**Phrasing Constraints**:
+1.  Do NOT refer to "the text provided", "the passage", or "the snippet".
+2.  Instead, use natural phrasing like "In the lecture..." or "As explained...".
+3.  The question must be standalone.
+
+**Mathematical Formatting**:
+-   ALWAYS use valid LaTeX for mathematical symbols and equations (e.g., `\\mathbb{{R}}`, `\\epsilon > 0`).
+-   Do NOT use Unicode math characters (use `\\in` not `∈`).
+
+Context:
+{context}
+
+Return the output in the following JSON format:
+{{
+  "questions": ['The first question text', 'The second question text', ... 'Question x <= {n_questions} text'],
+  "answers": ['Answer to first question', 'Answer to second question', ... 'Answer to question {n_questions}'],
+}}
+"""
+
+EVALUATION_PROMPT = """
+### SYSTEM ROLE
+You are an expert university pedagogue and NLP evaluator. Your task is to rigorously evaluate the quality of a generated exam question-answer pair based *only* on the provided source context.
+
+### INPUT DATA
+- **Source Context:** {context}
+- **Generated Question:** {question}
+- **Generated Answer:** {answer}
+
+### EVALUATION CRITERIA
+Rate each of the following 9 criteria on a scale of 1-5.
+
+#### A. Linguistic Quality
+1. **Clarity**: Is the question unambiguous and specific?
+   - 1: Vague or confusing; multiple interpretations possible.
+   - 5: Crystal clear intent and meaning.
+2. **Conciseness**: Is it free from unnecessary verbosity?
+   - 1: Extremely verbose or contains redundant modifiers.
+   - 5: Concise and to the point.
+
+#### B. Content Alignment (Grounding)
+3. **Relevance**: Does it target key information from the text?
+   - 1: Asks about trivial/irrelevant details.
+   - 5: Targets the core concept of the passage.
+4. **Consistency**: Is it factually aligned with the passage?
+   - 1: Contradicts the text or hallucinates facts.
+   - 5: Perfectly consistent with the source.
+5. **Answerability**: Can the answer be found in the given context and only very basic external knowledge?
+   - 1: Impossible to answer given only this context chunk.
+   - 5: Answer is explicitly and clearly in the text.
+
+6. **Answer Consistency**: Does the provided answer actually answer the question asked?
+  - 1: The answer does not match the question (wrong target, incomplete, or off-topic).
+  - 5: The answer perfectly addresses the specific question.
+
+#### C. Pedagogical Value
+7. **Educational Complexity**: What level of cognitive effort is required (Bloom's Taxonomy) and how much information is needed? Does it require more than a single fact or concept?
+  - 1: Simple Recall (e.g., "What is X?").
+  - 2: Basic Understanding (e.g., "State the definition/meaning of X." / "Identify a stated property of X.").
+  - 3: Application/Inference (e.g., "Why does X happen?" / "Use the stated rule to determine ...").
+  - 4: Analysis/Integration (e.g., "How does X relate to Y according to the text?" / "Explain a consequence of the definition.").
+  - 5: Synthesis/Evaluation (e.g., "Compare X and Y..." / "Argue which approach is preferable and why.").
+
+8. **Independence (Answer Leakage)**: Does the question leak the answer?
+   - 1: The question gives away the answer (e.g., "Since X is Y, why...?").
+   - 5: The question stands alone without hinting at the solution.
+#### D. Holistic Assessment
+9. **Overall Quality**: A holistic score considering all factors, with a strong emphasis on educational objectives.
+  - Educational value is crucial: prioritize questions that test understanding and the combination/integration of concepts (i.e., higher Educational Complexity).
+  - Penalize questions that are merely simple recall, even if they are clear and factually consistent.
+  - If a question fails on critical issues (e.g., hallucination/ungrounded content, or answer leakage), this score should be low regardless of linguistic features.
+
+### OUTPUT FORMAT
+Return valid JSON only. Structure:
+{{
+  "clarity": {{ "reasoning": "...", "score": <int> }},
+  "conciseness": {{ "reasoning": "...", "score": <int> }},
+  "relevance": {{ "reasoning": "...", "score": <int> }},
+  "consistency": {{ "reasoning": "...", "score": <int> }},
+  "answerability": {{ "reasoning": "...", "score": <int> }},
+  "answer_consistency": {{ "reasoning": "...", "score": <int> }},
+  "educational_complexity": {{ "reasoning": "...", "score": <int> }},
+  "independence": {{ "reasoning": "...", "score": <int> }},
+  "overall_review": {{ "reasoning": "...", "score": <int> }}
 }}
 """
 

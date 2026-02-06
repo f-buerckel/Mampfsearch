@@ -1,14 +1,318 @@
 from mampfsearch.utils.config import get_graph_storage, get_llm_client
-from mampfsearch.core.entity_selection import find_relevant_entities_in_lecture
 from mampfsearch.utils.models import SegmentNode, MathEntity
 from mampfsearch.utils import prompts, config
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Iterable, Tuple
 
 import re
 import logging
 import json
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_SYSTEM_PROMPT = "You are a careful assistant. Follow the instructions exactly and respond with only the requested JSON."
+
+
+def _word_count(text: str) -> int:
+    return len(re.findall(r"\S+", text or ""))
+
+
+def _truncate_to_word_limit(text: str, max_words: int) -> str:
+    if max_words <= 0:
+        return ""
+    words = re.findall(r"\S+", text or "")
+    if len(words) <= max_words:
+        return text
+    truncated = " ".join(words[:max_words]).rstrip()
+    return truncated + " ..."
+
+
+def _build_separated_context_blocks(
+    blocks: List[Tuple[str, str]],
+    max_words: int,
+) -> str:
+    """Combine titled blocks into a single context string under a word budget.
+
+    Blocks are kept separate via headers. If the total exceeds max_words, later blocks
+    are truncated first; the first block should be the main span.
+    """
+
+    remaining = max_words
+    rendered_parts: List[str] = []
+
+    for title, content in blocks:
+        header = f"\n\n### {title}\n"
+        header_words = _word_count(header)
+        if remaining <= header_words:
+            break
+        remaining -= header_words
+
+        trimmed = _truncate_to_word_limit(content or "", remaining)
+        rendered_parts.append(header + trimmed)
+        remaining -= _word_count(trimmed)
+        if remaining <= 0:
+            break
+
+    return "".join(rendered_parts).lstrip()
+
+
+def _get_bio_classification_label(labels: Iterable[str]) -> Optional[str]:
+    for label in sorted(labels or []):
+        lower = label.lower()
+        if lower.startswith("b-") or lower.startswith("i-"):
+            return label
+    return None
+
+
+def _has_classification_label(seg_node: SegmentNode, type_name: str) -> bool:
+    type_lower = (type_name or "").lower()
+    if not type_lower:
+        return False
+    for label in seg_node.labels or []:
+        label_lower = label.lower()
+        if label_lower == f"b-{type_lower}" or label_lower == f"i-{type_lower}":
+            return True
+    return False
+
+
+def create_multi_entity_segment_spanning_question(
+    segments: List[SegmentNode],
+    entity_name: str,
+    n_questions_per_span: int = 3,
+    max_context_words: int = 6000,
+    definition_label: str = "definition",
+):
+    """Generate multi-entity spanning questions with enriched context.
+
+    Similar to `create_multiple_segment_spanning_question`, but additionally:
+    - Extracts all entities mentioned in the main span.
+    - For each mentioned entity (excluding the target), adds:
+      1) a combined 'definition' span about that entity (case-insensitive)
+      2) a combined co-mention span containing segments that mention BOTH the target
+         entity and that related entity.
+    - Keeps these context blocks separate and instructs the LLM accordingly.
+    - Caps the context length to ~max_context_words.
+    """
+
+    target_lower = (entity_name or "").strip().lower()
+    if not target_lower:
+        return []
+
+    segments = sorted(segments, key=lambda s: s.segment.position)
+    all_segment_ids = [s.graph_id for s in segments]
+
+    spans: List[Tuple[str, List[SegmentNode]]] = []
+    current_span: List[SegmentNode] = []
+    current_type_lower: Optional[str] = None
+
+    for seg_node in segments:
+        classification_label = _get_bio_classification_label(seg_node.labels)
+        if not classification_label:
+            if current_span:
+                spans.append((current_type_lower or "", current_span))
+                current_span = []
+                current_type_lower = None
+            continue
+
+        parts = classification_label.split("-", 1)
+        prefix = parts[0].strip().lower()
+        type_part_lower = (parts[1] if len(parts) > 1 else "").strip().lower()
+
+        if prefix == "b":
+            if current_span:
+                spans.append((current_type_lower or "", current_span))
+            current_span = [seg_node]
+            current_type_lower = type_part_lower
+        elif prefix == "i":
+            if current_span:
+                last_seg = current_span[-1]
+                last_class = _get_bio_classification_label(last_seg.labels) or ""
+                last_parts = last_class.split("-", 1)
+                last_type_lower = (
+                    (last_parts[1] if len(last_parts) > 1 else "").strip().lower()
+                )
+                if (
+                    last_type_lower == type_part_lower
+                    and seg_node.segment.position == last_seg.segment.position + 1
+                ):
+                    current_span.append(seg_node)
+                    current_type_lower = type_part_lower
+                else:
+                    spans.append((current_type_lower or "", current_span))
+                    current_span = [seg_node]
+                    current_type_lower = type_part_lower
+            else:
+                current_span = [seg_node]
+                current_type_lower = type_part_lower
+
+    if current_span:
+        spans.append((current_type_lower or "", current_span))
+
+    valid_spans: List[Tuple[str, List[SegmentNode]]] = []
+    for span_type, span in spans:
+        if not span:
+            continue
+        about = (span[0].segment.about_entity or "").strip().lower()
+        if about and about == target_lower:
+            valid_spans.append((span_type, span))
+
+    if not valid_spans:
+        return []
+
+    llm_client = get_llm_client()
+    graph_storage = get_graph_storage()
+
+    # Pre-fetch mentioned entity names per segment for efficient co-mention filtering.
+    try:
+        mentions_by_segment_id = graph_storage.get_entity_mentions_for_segments(
+            all_segment_ids
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch entity mentions for segments: {e}")
+        mentions_by_segment_id = {}
+
+    questions = []
+
+    for span_type, span in valid_spans:
+        span_text = "\n".join([s.segment.text for s in span])
+
+        # Entities mentioned in main span
+        entities = graph_storage.get_entities_in_segments(span)
+        related_entities: Dict[str, str] = {}
+        descriptions: Dict[str, str] = {}
+
+        for ent_node in entities:
+            ent = ent_node.math_entity
+            name = (ent.name or "").strip()
+            if not name:
+                continue
+            name_lower = name.lower()
+            if name_lower == target_lower:
+                continue
+            # Keep a stable original casing for display
+            related_entities[name_lower] = name
+            if ent.description:
+                descriptions[name] = ent.description
+
+        other_entities_list = sorted(related_entities.values(), key=lambda s: s.lower())
+
+        mentioned_entities_block = (
+            "\n".join([f"- {n}" for n in other_entities_list])
+            if other_entities_list
+            else "(none detected)"
+        )
+
+        description_text = "\n".join(
+            [f"{name}: {desc}" for name, desc in descriptions.items()]
+        )
+
+        blocks: List[Tuple[str, str]] = [
+            (f"Main Text (span type: {span_type or 'unknown'})", span_text),
+            ("Mentioned Entities In Main Span", mentioned_entities_block),
+        ]
+        if description_text.strip():
+            blocks.append(("Related Entity Descriptions", description_text))
+
+        # Add definition + co-mention contexts for each related entity
+        for related_lower, related_name in sorted(related_entities.items()):
+            # Definition segments about the related entity (case-insensitive)
+            def_segments = [
+                s
+                for s in segments
+                if (s.segment.about_entity or "").strip().lower() == related_lower
+                and _has_classification_label(s, definition_label)
+            ]
+            def_segments.sort(key=lambda s: s.segment.position)
+            if def_segments:
+                def_text = "\n".join([s.segment.text for s in def_segments])
+                blocks.append((f"Definition Context — {related_name}", def_text))
+
+            # Co-mention segments: mention BOTH target and related entity (case-insensitive)
+            comention_segments: List[SegmentNode] = []
+            for s in segments:
+                mentioned = mentions_by_segment_id.get(s.graph_id, set())
+                if target_lower in mentioned and related_lower in mentioned:
+                    comention_segments.append(s)
+            comention_segments.sort(key=lambda s: s.segment.position)
+            if comention_segments:
+                comention_text = "\n".join([s.segment.text for s in comention_segments])
+                blocks.append(
+                    (
+                        f"Co-mention Context — {entity_name} + {related_name}",
+                        comention_text,
+                    )
+                )
+
+        full_context = _build_separated_context_blocks(
+            blocks=blocks,
+            max_words=max_context_words,
+        )
+
+        prompt = prompts.CREATE_MULTI_ENTITY_SPANNING_QUESTION_PROMPT.format(
+            entity=entity_name,
+            context=full_context,
+            n_questions=n_questions_per_span,
+            other_entities=other_entities_list,
+        )
+
+        try:
+            response = llm_client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                temperature=0.0,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": _DEFAULT_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+            )
+            response_content = response.choices[0].message.content
+            response_dict = parse_llm_response(
+                response=response_content,
+                keys=("questions", "answers", "explanations"),
+            )
+            if not response_dict:
+                continue
+
+            generated_questions = response_dict.get("questions") or []
+            generated_answers = response_dict.get("answers") or []
+            generated_explanations = response_dict.get("explanations") or []
+
+            for q, a, e in zip(
+                generated_questions, generated_answers, generated_explanations
+            ):
+                if not q or not a:
+                    continue
+
+                scores = evaluate_question_with_llm(
+                    context=full_context,
+                    question=q,
+                    answer=a,
+                    entity_name=entity_name,
+                )
+
+                questions.append(
+                    {
+                        "span_type": span_type,
+                        "span_text": span_text,
+                        "question": q,
+                        "answer": a,
+                        "explanation": e,
+                        "span_ids": [s.graph_id for s in span],
+                        "context": full_context,
+                        "evaluation": scores,
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"Error during multi-entity spanning question LLM call: {e}")
+            continue
+
+    return questions
 
 
 def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
@@ -70,9 +374,14 @@ def create_factual_questions(segments: List[SegmentNode], entity_name: str):
         try:
             response = llm_client.chat.completions.create(
                 model="openai/gpt-oss-20b",
+                temperature=0.0,
                 messages=[
                     {
                         "role": "system",
+                        "content": _DEFAULT_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
                         "content": prompt,
                     },
                 ],
@@ -109,9 +418,14 @@ def create_multiple_choice_question(segments: List[SegmentNode], entity_name: st
         try:
             response = llm_client.chat.completions.create(
                 model="openai/gpt-oss-20b",
+                temperature=0.0,
                 messages=[
                     {
                         "role": "system",
+                        "content": _DEFAULT_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
                         "content": prompt,
                     },
                 ],
@@ -146,7 +460,9 @@ def create_multiple_choice_question(segments: List[SegmentNode], entity_name: st
 
 
 def create_multiple_segment_spanning_question(
-    segments: List[SegmentNode], entity_name: str
+    segments: List[SegmentNode],
+    entity_name: str,
+    n_questions_per_span: int = 5,
 ):
     # Sort segments by position
     segments = sorted(segments, key=lambda s: s.segment.position)
@@ -181,9 +497,9 @@ def create_multiple_segment_spanning_question(
                 last_labels = last_seg.labels
                 last_class = next(
                     (
-                        l
-                        for l in last_labels
-                        if l.startswith("B-") or l.startswith("I-")
+                        label
+                        for label in last_labels
+                        if label.startswith("B-") or label.startswith("I-")
                     ),
                     "",
                 )
@@ -241,48 +557,66 @@ def create_multiple_segment_spanning_question(
         )
 
         prompt = prompts.CREATE_SPANNING_QUESTION_PROMPT.format(
-            entity=entity_name, context=full_context
+            entity=entity_name,
+            context=full_context,
+            n_questions=n_questions_per_span,
         )
 
         try:
             response = llm_client.chat.completions.create(
                 model="openai/gpt-oss-20b",
+                temperature=0.0,
                 messages=[
                     {
                         "role": "system",
+                        "content": _DEFAULT_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
                         "content": prompt,
                     },
                 ],
             )
             response_content = response.choices[0].message.content
             response_dict = parse_llm_response(
-                response=response_content, keys=("question", "answer", "explanation")
+                response=response_content,
+                keys=("questions", "answers", "explanations"),
             )
             if response_dict:
                 logger.debug(f"Spanning Question Prompt:\n{full_context}")
-                logger.debug(f"Question: {response_dict['question']}")
-                logger.debug(f"Answer: {response_dict['answer']}")
-                logger.debug(f"Explanation: {response_dict['explanation']}")
+                generated_questions = response_dict.get("questions") or []
+                generated_answers = response_dict.get("answers") or []
+                generated_explanations = response_dict.get("explanations") or []
 
-                scores = evaluate_question_with_llm(
-                    context=full_context,
-                    question=response_dict["question"],
-                    answer=response_dict["answer"],
-                    entity_name=entity_name,
-                )
-                logger.debug(f"Evaluation Scores: {scores}")
+                for q, a, e in zip(
+                    generated_questions, generated_answers, generated_explanations
+                ):
+                    if not q or not a:
+                        continue
 
-                questions.append(
-                    {
-                        "span_text": span_text,
-                        "question": response_dict["question"],
-                        "answer": response_dict["answer"],
-                        "explanation": response_dict["explanation"],
-                        "span_ids": [s.graph_id for s in span],
-                        "context": full_context,
-                        "evaluation": scores,
-                    }
-                )
+                    logger.debug(f"Question: {q}")
+                    logger.debug(f"Answer: {a}")
+                    logger.debug(f"Explanation: {e}")
+
+                    scores = evaluate_question_with_llm(
+                        context=full_context,
+                        question=q,
+                        answer=a,
+                        entity_name=entity_name,
+                    )
+                    logger.debug(f"Evaluation Scores: {scores}")
+
+                    questions.append(
+                        {
+                            "span_text": span_text,
+                            "question": q,
+                            "answer": a,
+                            "explanation": e,
+                            "span_ids": [s.graph_id for s in span],
+                            "context": full_context,
+                            "evaluation": scores,
+                        }
+                    )
 
         except Exception as e:
             logger.error(f"Error during spanning question LLM call: {e}")
@@ -298,8 +632,6 @@ def evaluate_question(
     entities: List[MathEntity],
     entity_name: str,
 ):
-    similarity = similarity_to_context(context, question)
-
     llm_score = evaluate_question_with_llm(
         context=context, question=question, answer=answer, entity_name=entity_name
     )
@@ -307,20 +639,24 @@ def evaluate_question(
     return llm_score
 
 
-def generate_unstructured_questions(
-    context: str, n_questions: int = 10, entity_name: str = ""
-):
+def generate_unstructured_questions(context: str, n_questions: int = 10):
     llm_client = get_llm_client()
-    prompt = prompts.CREATE_UNSTRUCTURED_QUESTION_PROMPT.format(
-        context=context, n_questions=n_questions, entity=entity_name
+
+    prompt = prompts.CREATE_UNSTRUCTURED_QUESTION_PROMPT_NO_ENTITY.format(
+        context=context, n_questions=n_questions
     )
 
     try:
         response = llm_client.chat.completions.create(
             model="openai/gpt-oss-20b",
+            temperature=0.0,
             messages=[
                 {
                     "role": "system",
+                    "content": _DEFAULT_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
                     "content": prompt,
                 },
             ],
@@ -350,9 +686,14 @@ def evaluate_question_with_llm(
     try:
         response = llm_client.chat.completions.create(
             model="openai/gpt-oss-20b",
+            temperature=0.0,
             messages=[
                 {
                     "role": "system",
+                    "content": _DEFAULT_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
                     "content": prompt,
                 },
             ],
