@@ -1,0 +1,31 @@
+"lecture_name","entity_name","context","question","answer"
+"18100a-lecture-23-multicam_360p_16_9","absolute value","### Main Text (span type: proof)
+proof follows immediately from the root test. Because if we take limit as j goes to infinity of a sub j absolute value x minus x0 j, 1 over j, This is equal to x minus x0. This kills that j. This is just a fixed number, so this pops out of the limit.
+This kills that j. This is just a fixed number, so this pops out of the limit. And this limit exists, so this equals x minus x0 times r. And we have two things happening. This is less than 1 if x minus x naught is less than rho. Bigger than 1 if x minus x naught is bigger than rho.
+This is less than 1 if x minus x naught is less than rho. Bigger than 1 if x minus x naught is bigger than rho. Okay, this number here. And therefore by the root test. The theorem holds, OK? So we see that this series, where the, if you like, what's given are the coefficients a sub j and x0, and what could change is x, that this series converges as long as x minus x0 is less than rho. So as long as we stay in that interval, a symmetric interval about x0, then this series converges.
+
+### Mentioned Entities In Main Span
+- limit
+- root test
+
+### Related Entity Descriptions
+limit: value that a function (or sequence) approaches as the argument (or index) approaches some value
+root test: Criterion for the convergence of an infinite series
+
+### Definition Context — root test
+the root test. Suppose this number r which is the limit as j goes to infinity of a sub j 1 over j exists. So it's a finite number, positive, non-negative number. And define rho to be 1 over r if r is bigger than 0, and infinity if r equals 0. So it's a finite number, positive, non-negative number. And define rho to be 1 over r if r is bigger than 0, and infinity if r equals 0. then we have the following conclusion that this power series a sub j converges absolutely if x minus x naught is less than rho  and diverges if x minus x not an absolute value is bigger than rho, okay? And this number rho we refer to as radius of convergence. OK, so again, the proof follows immediately from the root test.","According to the definition of limit, explain why the sequence \(a_j = |x-x_0|^j\) raised to the power \(1/j\) has a limit and what that limit is, and how this fact is used in the proof to relate the convergence of the series to the inequality \(|x-x_0|<\rho\).","The sequence simplifies to \(|x-x_0|\) for every \(j\), so its limit is \(|x-x_0|\). By the definition of limit, for any \(\epsilon>0\) we can choose \(N=1\) such that \(|a_j - |x-x_0||<\epsilon\) for all \(j\ge N\). This limit is the value \(r\) in the root test, and the proof uses the condition \(|x-x_0|<\rho\) where \(\rho=1/r\) to determine convergence."
+"18100a-lecture-23-multicam_360p_16_9","absolute value","### Main Text (span type: proof)
+proof follows immediately from the root test. Because if we take limit as j goes to infinity of a sub j absolute value x minus x0 j, 1 over j, This is equal to x minus x0. This kills that j. This is just a fixed number, so this pops out of the limit.
+This kills that j. This is just a fixed number, so this pops out of the limit. And this limit exists, so this equals x minus x0 times r. And we have two things happening. This is less than 1 if x minus x naught is less than rho. Bigger than 1 if x minus x naught is bigger than rho.
+This is less than 1 if x minus x naught is less than rho. Bigger than 1 if x minus x naught is bigger than rho. Okay, this number here. And therefore by the root test. The theorem holds, OK? So we see that this series, where the, if you like, what's given are the coefficients a sub j and x0, and what could change is x, that this series converges as long as x minus x0 is less than rho. So as long as we stay in that interval, a symmetric interval about x0, then this series converges.
+
+### Mentioned Entities In Main Span
+- limit
+- root test
+
+### Related Entity Descriptions
+limit: value that a function (or sequence) approaches as the argument (or index) approaches some value
+root test: Criterion for the convergence of an infinite series
+
+### Definition Context — root test
+the root test. Suppose this number r which is the limit as j goes to infinity of a sub j 1 over j exists. So it's a finite number, positive, non-negative number. And define rho to be 1 over r if r is bigger than 0, and infinity if r equals 0. So it's a finite number, positive, non-negative number. And define rho to be 1 over r if r is bigger than 0, and infinity if r equals 0. then we have the following conclusion that this power series a sub j converges absolutely if x minus x naught is less than rho  and diverges if x minus x not an absolute value is bigger than rho, okay? And this number rho we refer to as radius of convergence. OK, so again, the proof follows immediately from the root test.","Using the root test definition, explain why when the limit \(r\) equals zero (hence \(\rho=\infty\)), the series converges absolutely for every real \(x\), and how the absolute value \(|x-x_0|\) appears in this conclusion.","If \(r=0\), then \(\rho=1/r=\infty\). The root test states the series converges absolutely whenever \(|x-x_0|<\rho\). Since \(\rho\) is infinite, the inequality \(|x-x_0|<\infty\) holds for all real \(x\). Thus the series converges absolutely for every \(x\). The absolute value appears as the distance from \(x\) to the center \(x_0\), which is always finite."

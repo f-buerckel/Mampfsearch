@@ -1,0 +1,8 @@
+Lecture Name: 18100a-lecture-23-multicam_360p_16_9
+Model Name: gpt-oss 20b
+Timestamp: 20260207_171935
+Sentences Per Chunk: 10
+Questions Per Chunk: 1
+Max Definition Words: 500
+Max Comention Words: 1500
+Max Comention Entities: 5

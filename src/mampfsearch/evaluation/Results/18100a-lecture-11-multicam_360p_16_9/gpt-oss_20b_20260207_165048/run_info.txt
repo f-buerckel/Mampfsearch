@@ -1,0 +1,16 @@
+Lecture Name: 18100a-lecture-11-multicam_360p_16_9
+Model Name: gpt-oss 20b
+Timestamp: 20260207_165048
+Sentences Per Chunk: 10
+Questions Per Chunk: 1
+Max Definition Words: 500
+Max Comention Words: 1500
+Max Comention Entities: 5
+
+--- LLM Usage Statistics ---
+QG Multi-Entity: Input=123135, Output=17886
+QG Unstructured: Input=22023, Output=6835
+Eval Multi-Entity: Input=80833, Output=11062
+Eval Unstructured: Input=45129, Output=15339
+Pairwise Eval: Input=54616, Output=45552
+TOTAL: Input=325736, Output=96674

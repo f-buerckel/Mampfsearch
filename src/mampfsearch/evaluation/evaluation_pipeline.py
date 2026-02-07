@@ -72,7 +72,7 @@ def run_pipeline(
     with open(gen_multi_csv, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=csv_header, quoting=csv.QUOTE_ALL)
         writer.writeheader()
-        generate_multi_entity_spanning_questions_for_lecture(
+        stats_qg_multi = generate_multi_entity_spanning_questions_for_lecture(
             lecture_name=lecture_name,
             writer=writer,
             graph_storage=graph_storage,
@@ -86,7 +86,7 @@ def run_pipeline(
     with open(gen_unstructured_csv, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=csv_header, quoting=csv.QUOTE_ALL)
         writer.writeheader()
-        generate_unstructured_questions_for_lecture(
+        stats_qg_unstructured = generate_unstructured_questions_for_lecture(
             lecture_name=lecture_name,
             writer=writer,
             graph_storage=graph_storage,
@@ -101,11 +101,11 @@ def run_pipeline(
 
     # 5a. Evaluate Multi-Entity
     logger.info("Step 3/5: Evaluating Multi-Entity Questions...")
-    evaluate_dataset(gen_multi_csv, eval_multi_csv)
+    stats_eval_multi = evaluate_dataset(gen_multi_csv, eval_multi_csv)
 
     # 5b. Evaluate Unstructured
     logger.info("Step 4/5: Evaluating Unstructured Questions...")
-    evaluate_dataset(gen_unstructured_csv, eval_unstructured_csv)
+    stats_eval_unstructured = evaluate_dataset(gen_unstructured_csv, eval_unstructured_csv)
 
     # 6. Visualize Results
     logger.info("Step 5/5: Generating Visualization Plots...")
@@ -123,7 +123,8 @@ def run_pipeline(
     pairwise_csv = os.path.join(run_dir, "pairwise_results.csv")
 
     # We compare Unstructured (A) vs Multi-Entity (B)
-    run_pairwise_evaluation(
+    # We compare Unstructured (A) vs Multi-Entity (B)
+    stats_pairwise = run_pairwise_evaluation(
         csv_a=gen_unstructured_csv,  # Evaluating Q/A pairs quality directly, usually on generated files before distinct eval or after?
         # Pairwise usually takes the raw Q/A, which are in the generated files.
         csv_b=gen_multi_csv,
@@ -133,6 +134,39 @@ def run_pipeline(
         n_pairs=150,  # Defaulting to 50 for speed, user can adjust if we added arg
         model="openai/gpt-oss-20b",  # Default judge model
     )
+
+    logger.info("Pipeline Completed Successfully!")
+    
+    # Append stats to run_info.txt
+    try:
+        with open(info_path, "a") as f:
+            f.write("\n--- LLM Usage Statistics ---\n")
+            f.write(f"QG Multi-Entity: Input={stats_qg_multi.get('input_words', 0)}, Output={stats_qg_multi.get('output_words', 0)}\n")
+            f.write(f"QG Unstructured: Input={stats_qg_unstructured.get('input_words', 0)}, Output={stats_qg_unstructured.get('output_words', 0)}\n")
+            f.write(f"Eval Multi-Entity: Input={stats_eval_multi.get('input_words', 0)}, Output={stats_eval_multi.get('output_words', 0)}\n")
+            f.write(f"Eval Unstructured: Input={stats_eval_unstructured.get('input_words', 0)}, Output={stats_eval_unstructured.get('output_words', 0)}\n")
+            f.write(f"Pairwise Eval: Input={stats_pairwise.get('input_words', 0)}, Output={stats_pairwise.get('output_words', 0)}\n")
+            
+            # Total
+            total_input = (
+                stats_qg_multi.get('input_words', 0) + 
+                stats_qg_unstructured.get('input_words', 0) + 
+                stats_eval_multi.get('input_words', 0) + 
+                stats_eval_unstructured.get('input_words', 0) + 
+                stats_pairwise.get('input_words', 0)
+            )
+            total_output = (
+                stats_qg_multi.get('output_words', 0) + 
+                stats_qg_unstructured.get('output_words', 0) + 
+                stats_eval_multi.get('output_words', 0) + 
+                stats_eval_unstructured.get('output_words', 0) + 
+                stats_pairwise.get('output_words', 0)
+            )
+            f.write(f"TOTAL: Input={total_input}, Output={total_output}\n")
+            
+        logger.info(f"Appended LLM usage stats to {info_path}")
+    except Exception as e:
+        logger.error(f"Failed to append stats to run_info.txt: {e}")
 
     logger.info("Pipeline Completed Successfully!")
     logger.info(f"All results are available in: {run_dir}")

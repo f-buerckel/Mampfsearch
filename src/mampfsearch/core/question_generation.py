@@ -56,7 +56,9 @@ def _build_separated_context_blocks(
     return "".join(rendered_parts).lstrip()
 
 
-def _group_and_format_segments(segments: List[SegmentNode], separator: str = "\n[...]\n") -> str:
+def _group_and_format_segments(
+    segments: List[SegmentNode], separator: str = "\n[...]\n"
+) -> str:
     """Group consecutive segments into paragraphs and separate non-consecutive ones.
 
     Segments are considered consecutive if their positions are adjacent (diff == 1).
@@ -65,10 +67,10 @@ def _group_and_format_segments(segments: List[SegmentNode], separator: str = "\n
         return ""
 
     sorted_segments = sorted(segments, key=lambda s: s.segment.position)
-    
+
     formatted_groups = []
     current_group = []
-    
+
     for seg in sorted_segments:
         if not current_group:
             current_group.append(seg)
@@ -81,11 +83,11 @@ def _group_and_format_segments(segments: List[SegmentNode], separator: str = "\n
                 group_text = " ".join([s.segment.text for s in current_group])
                 formatted_groups.append(group_text)
                 current_group = [seg]
-    
+
     if current_group:
         group_text = " ".join([s.segment.text for s in current_group])
         formatted_groups.append(group_text)
-        
+
     return separator.join(formatted_groups)
 
 
@@ -134,7 +136,9 @@ def create_multi_entity_segment_spanning_question(
 
     target_lower = (entity_name or "").strip().lower()
     if not target_lower:
-        logger.warning(f"Skipping question generation: Invalid entity name '{entity_name}'")
+        logger.warning(
+            f"Skipping question generation: Invalid entity name '{entity_name}'"
+        )
         return []
 
     segments = sorted(segments, key=lambda s: s.segment.position)
@@ -207,10 +211,12 @@ def create_multi_entity_segment_spanning_question(
     for span_type, span in spans:
         if not span:
             continue
-        
+
         # Check if span is about target
-        is_about_target = (span[0].segment.about_entity or "").strip().lower() == target_lower
-        
+        is_about_target = (
+            span[0].segment.about_entity or ""
+        ).strip().lower() == target_lower
+
         if is_about_target:
             about_spans.append((span_type, span))
         else:
@@ -220,29 +226,38 @@ def create_multi_entity_segment_spanning_question(
                 if target_lower in mentions_by_segment_id.get(s.graph_id, set()):
                     is_mentioned = True
                     break
-            
+
             if is_mentioned:
                 mentioned_spans.append((span_type, span))
 
     # Sample mentioned spans if needed
     if len(mentioned_spans) > max_mentioned_spans:
-        logger.info(f"Sampling {max_mentioned_spans} mentioned spans from {len(mentioned_spans)} total.")
+        logger.info(
+            f"Sampling {max_mentioned_spans} mentioned spans from {len(mentioned_spans)} total."
+        )
         mentioned_spans = random.sample(mentioned_spans, max_mentioned_spans)
-    
+
     # Combine valid spans
     valid_spans = about_spans + mentioned_spans
 
     # Performance Logging
-    logger.info(f"Entity '{entity_name}': Found {len(valid_spans)} valid spans "
-                f"({len(about_spans)} 'about', {len(mentioned_spans)} 'mentioned').")
+    logger.info(
+        f"Entity '{entity_name}': Found {len(valid_spans)} valid spans "
+        f"({len(about_spans)} 'about', {len(mentioned_spans)} 'mentioned')."
+    )
 
     if not valid_spans:
-        logger.info(f"No valid spans found for entity '{entity_name}' (target_lower='{target_lower}'). "
-                    f"This entity is neither the subject nor mentioned in any segment.")
-        return []
+        logger.info(
+            f"No valid spans found for entity '{entity_name}' (target_lower='{target_lower}'). "
+            f"This entity is neither the subject nor mentioned in any segment."
+        )
+        return [], {"input_words": 0, "output_words": 0}
 
     llm_client = get_llm_client()
     questions = []
+    
+    total_input_words = 0
+    total_output_words = 0
 
     for span_type, span in valid_spans:
         span_text = "\n".join([s.segment.text for s in span])
@@ -263,8 +278,8 @@ def create_multi_entity_segment_spanning_question(
 
             # Filter non-allowed entities if allowlist is provided
             if allowed_related_entities is not None:
-                 if name_lower not in allowed_related_entities:
-                     continue
+                if name_lower not in allowed_related_entities:
+                    continue
 
             # Keep a stable original casing for display
             related_entities[name_lower] = name
@@ -281,16 +296,15 @@ def create_multi_entity_segment_spanning_question(
                 if target_lower in mentioned and related_lower in mentioned:
                     count += 1
             comention_counts[related_lower] = count
-        
+
         # Sort by count (descending), then name (ascending) for stability
         sorted_related_keys = sorted(
-            related_entities.keys(),
-            key=lambda k: (-comention_counts.get(k, 0), k)
+            related_entities.keys(), key=lambda k: (-comention_counts.get(k, 0), k)
         )
-        
+
         # Keep top K
         top_k_keys = sorted_related_keys[:max_comention_entities]
-                
+
         other_entities_list = [related_entities[k] for k in top_k_keys]
         # Sort alphabetically for display in the prompt list
         other_entities_list.sort(key=lambda s: s.lower())
@@ -302,7 +316,11 @@ def create_multi_entity_segment_spanning_question(
         )
 
         description_text = "\n".join(
-            [f"{related_entities[k]}: {descriptions.get(related_entities[k], '')}" for k in top_k_keys if descriptions.get(related_entities[k])]
+            [
+                f"{related_entities[k]}: {descriptions.get(related_entities[k], '')}"
+                for k in top_k_keys
+                if descriptions.get(related_entities[k])
+            ]
         )
 
         blocks: List[Tuple[str, str]] = [
@@ -313,10 +331,10 @@ def create_multi_entity_segment_spanning_question(
             blocks.append(("Related Entity Descriptions", description_text))
 
         # Consolidate Definition + Co-mention contexts
-        
+
         # Track seen segments to avoid duplication across blocks
         seen_segment_ids = set()
-        
+
         # Mark main span segments as seen
         for s in span:
             seen_segment_ids.add(s.graph_id)
@@ -324,11 +342,15 @@ def create_multi_entity_segment_spanning_question(
         # Iterate only over the filtered top K entities
         for related_lower in top_k_keys:
             related_name = related_entities[related_lower]
-            
+
             # 1. Definition segments
             def_segments = []
             for s in segments:
-                if (s.segment.about_entity or "").strip().lower() == related_lower and _has_classification_label(s, definition_label):
+                if (
+                    s.segment.about_entity or ""
+                ).strip().lower() == related_lower and _has_classification_label(
+                    s, definition_label
+                ):
                     if s.graph_id not in seen_segment_ids:
                         def_segments.append(s)
                         seen_segment_ids.add(s.graph_id)
@@ -348,14 +370,15 @@ def create_multi_entity_segment_spanning_question(
                     if s.graph_id not in seen_segment_ids:
                         comention_segments.append(s)
                         seen_segment_ids.add(s.graph_id)
-            
-            
+
             comention_segments.sort(key=lambda s: s.segment.position)
             if comention_segments:
                 # Use coherent grouping
                 comention_text = _group_and_format_segments(comention_segments)
                 # Truncate co-mention text
-                comention_text = _truncate_to_word_limit(comention_text, max_comention_words)
+                comention_text = _truncate_to_word_limit(
+                    comention_text, max_comention_words
+                )
                 blocks.append(
                     (
                         f"Co-mention Context — {entity_name} + {related_name}",
@@ -375,6 +398,9 @@ def create_multi_entity_segment_spanning_question(
             other_entities=other_entities_list,
         )
 
+        prompt_words = _word_count(prompt)
+        total_input_words += prompt_words
+
         try:
             response = llm_client.chat.completions.create(
                 model="openai/gpt-oss-20b",
@@ -391,16 +417,17 @@ def create_multi_entity_segment_spanning_question(
                 ],
             )
             response_content = response.choices[0].message.content
+            total_output_words += _word_count(response_content)
+
             response_dict = parse_llm_response(
                 response=response_content,
-                keys=("reasoning", "blooms_level", "questions", "answers", "explanations"),
+                keys=("reasoning", "questions", "answers", "explanations"),
             )
             if not response_dict:
                 continue
 
             reasoning = response_dict.get("reasoning", "")
-            blooms_level = response_dict.get("blooms_level", 0)
-            logger.info(f"Generated questions with Bloom's Level {blooms_level}. Reasoning: {reasoning}")
+            logger.info(f"Generated questions with reasoning: {reasoning}")
 
             generated_questions = response_dict.get("questions") or []
             generated_answers = response_dict.get("answers") or []
@@ -412,12 +439,16 @@ def create_multi_entity_segment_spanning_question(
                 if not q or not a:
                     continue
 
-                scores = evaluate_question_with_llm(
+                # evaluate_question_with_llm now returns (score, usage_stats)
+                scores, eval_stats = evaluate_question_with_llm(
                     context=full_context,
                     question=q,
                     answer=a,
                     entity_name=entity_name,
                 )
+                
+                total_input_words += eval_stats.get("input_words", 0)
+                total_output_words += eval_stats.get("output_words", 0)
 
                 questions.append(
                     {
@@ -436,7 +467,7 @@ def create_multi_entity_segment_spanning_question(
             logger.error(f"Error during multi-entity spanning question LLM call: {e}")
             continue
 
-    return questions
+    return questions, {"input_words": total_input_words, "output_words": total_output_words}
 
 
 def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
@@ -704,13 +735,21 @@ def create_multiple_segment_spanning_question(
             response_content = response.choices[0].message.content
             response_dict = parse_llm_response(
                 response=response_content,
-                keys=("reasoning", "blooms_level", "questions", "answers", "explanations"),
+                keys=(
+                    "reasoning",
+                    "blooms_level",
+                    "questions",
+                    "answers",
+                    "explanations",
+                ),
             )
             if response_dict:
                 logger.debug(f"Spanning Question Prompt:\n{full_context}")
                 reasoning = response_dict.get("reasoning") or "No reasoning provided."
                 blooms_level = response_dict.get("blooms_level", 0)
-                logger.info(f"Generated questions with Bloom's Level {blooms_level}. Reasoning: {reasoning}")
+                logger.info(
+                    f"Generated questions with Bloom's Level {blooms_level}. Reasoning: {reasoning}"
+                )
                 generated_questions = response_dict.get("questions") or []
                 generated_answers = response_dict.get("answers") or []
                 generated_explanations = response_dict.get("explanations") or []
@@ -773,6 +812,9 @@ def generate_unstructured_questions(context: str, n_questions: int = 10):
         context=context, n_questions=n_questions
     )
 
+    prompt_words = _word_count(prompt)
+    output_words = 0
+
     try:
         response = llm_client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -789,26 +831,34 @@ def generate_unstructured_questions(context: str, n_questions: int = 10):
             ],
         )
         content = response.choices[0].message.content
-        response = parse_llm_response(response=content, keys=("questions", "answers"))
-        if response:
-            return [
+        output_words = _word_count(content)
+        
+        response_dict = parse_llm_response(response=content, keys=("questions", "answers"))
+        
+        questions = []
+        if response_dict:
+            questions = [
                 {"question": q, "answer": a}
-                for q, a in zip(response["questions"], response["answers"])
+                for q, a in zip(response_dict["questions"], response_dict["answers"])
             ]
-        else:
-            return []
+        
+        return questions, {"input_words": prompt_words, "output_words": output_words}
+
     except Exception as e:
         logger.error(f"Error during unstructured question generation LLM call: {e}")
-        return []
+        return [], {"input_words": prompt_words, "output_words": 0}
 
 
 def evaluate_question_with_llm(
     context: str, question: str, answer: str, entity_name: str
-) -> float:
+) -> Tuple[float, Dict[str, int]]:
     llm_client = get_llm_client()
     prompt = prompts.QUESTION_EVALUATION_PROMPT.format(
         context=context, entity_name=entity_name, question=question, answer=answer
     )
+
+    prompt_words = _word_count(prompt)
+    output_words = 0
 
     try:
         response = llm_client.chat.completions.create(
@@ -825,9 +875,11 @@ def evaluate_question_with_llm(
                 },
             ],
         )
-        response = response.choices[0].message.content
+        content = response.choices[0].message.content
+        output_words = _word_count(content)
+        
         response_dict = parse_llm_response(
-            response=response,
+            response=content,
             keys=(
                 "reasoning_steps",
                 "faithfulness",
@@ -841,16 +893,16 @@ def evaluate_question_with_llm(
             # scores = {key: int(response_dict[key]) for key in response_dict.keys()}
 
             # return the average score:
-            return response_dict
+            return response_dict, {"input_words": prompt_words, "output_words": output_words}
             # return sum(scores.values()) / len(scores)
 
         else:
             logger.debug("LLM response did not contain all required evaluation keys.")
-            return 0.0
+            return 0.0, {"input_words": prompt_words, "output_words": output_words}
 
     except Exception as e:
         logger.error(f"Error during question evaluation LLM call: {e}")
-        return 0.0
+        return 0.0, {"input_words": prompt_words, "output_words": 0}
 
 
 def similarity_to_context(context: str, question: str):

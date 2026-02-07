@@ -346,7 +346,7 @@ def run_pairwise_evaluation(
     debug_invalid_dir: Optional[str] = None,
     sleep: float = 0.0,
     output: Optional[str] = None,
-) -> None:
+) -> Dict[str, int]:
     logging.basicConfig(level=logging.INFO)
 
     if n_pairs <= 0:
@@ -461,6 +461,7 @@ def run_pairwise_evaluation(
             return None
 
     total_prompt_words = 0
+    total_output_words = 0
 
     if is_json_output:
         # JSON output is buffered in-memory and written at the end.
@@ -498,6 +499,8 @@ def run_pairwise_evaluation(
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
+                if raw_response:
+                    total_output_words += _word_count(raw_response)
                 if raw_response:
                     raw_response_snippet = (raw_response or "").strip()[:800]
             except Exception as e:
@@ -602,7 +605,8 @@ def run_pairwise_evaluation(
             json.dump(result, f, indent=2, ensure_ascii=False)
         print(f"Total prompt word count (all pairs): {total_prompt_words}")
         logger.info(f"Saved pairwise results to {output_path}")
-        return
+        logger.info(f"Saved pairwise results to {output_path}")
+        return {"input_words": total_prompt_words, "output_words": total_output_words}
 
     summary = {
         "wins_a": wins_a,
@@ -677,6 +681,8 @@ def run_pairwise_evaluation(
                         temperature=temperature,
                         max_tokens=max_tokens,
                     )
+                    if raw_response:
+                        total_output_words += _word_count(raw_response)
                     if raw_response:
                         raw_response_snippet = (raw_response or "").strip()[:800]
                 except Exception as e:
@@ -804,6 +810,7 @@ def run_pairwise_evaluation(
     _write_summary()
     print(f"Total prompt word count (all pairs): {total_prompt_words}")
     logger.info(f"Saved pairwise results to {output_path}")
+    return {"input_words": total_prompt_words, "output_words": total_output_words}
 
 
 def main() -> None:

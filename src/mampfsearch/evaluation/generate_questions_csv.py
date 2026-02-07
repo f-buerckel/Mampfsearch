@@ -100,16 +100,19 @@ def generate_unstructured_questions_for_lecture(
     sentences_per_chunk: int = 10,
     questions_per_chunk: int = 5,
 ):
+    total_input_words = 0
+    total_output_words = 0
+
     logger.info(f"Processing lecture (unstructured): {lecture_name}")
     try:
         lecture_node = graph_storage.get_lecture_node(name=lecture_name)
         if not lecture_node:
             logger.error(f"Lecture with name '{lecture_name}' not found.")
-            return
+            return {"input_words": 0, "output_words": 0}
         lecture_id = lecture_node.graph_id
     except Exception as e:
         logger.error(f"Error fetching lecture node: {e}")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     # Get all segments to join for full transcript
     logger.info("Fetching segments for transcript...")
@@ -123,7 +126,7 @@ def generate_unstructured_questions_for_lecture(
         logger.info(f"Constructed transcript of length {len(full_transcript)}.")
     except Exception as e:
         logger.error(f"Error fetching/constructing transcript: {e}")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     def split_into_sentence_chunks(text: str, sentences_per_chunk: int) -> List[str]:
         cleaned = re.sub(r"\s+", " ", text).strip()
@@ -154,10 +157,13 @@ def generate_unstructured_questions_for_lecture(
     for idx, chunk in enumerate(chunks, 1):
         logger.info(f"Generating questions for chunk {idx}/{len(chunks)}")
         try:
-            questions = generate_unstructured_questions(
+            questions, stats = generate_unstructured_questions(
                 context=chunk,
                 n_questions=questions_per_chunk,
             )
+            
+            total_input_words += stats.get("input_words", 0)
+            total_output_words += stats.get("output_words", 0)
 
             for q in questions:
                 writer.writerow(
@@ -175,6 +181,7 @@ def generate_unstructured_questions_for_lecture(
             )
             continue
 
+    return {"input_words": total_input_words, "output_words": total_output_words}
 def generate_multi_entity_spanning_questions_for_lecture(
     lecture_name: str,
     writer,
@@ -185,16 +192,19 @@ def generate_multi_entity_spanning_questions_for_lecture(
     top_k_generation: int = 20,
     top_a_allowlist: int = 50,
 ):
+    total_input_words = 0
+    total_output_words = 0
+
     logger.info(f"Processing lecture (multi-entity spanning): {lecture_name}")
     try:
         lecture_node = graph_storage.get_lecture_node(name=lecture_name)
         if not lecture_node:
             logger.error(f"Lecture with name '{lecture_name}' not found.")
-            return
+            return {"input_words": 0, "output_words": 0}
         lecture_id = lecture_node.graph_id
     except Exception as e:
         logger.error(f"Error fetching lecture node: {e}")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     logger.info("Fetching segments...")
     try:
@@ -202,7 +212,7 @@ def generate_multi_entity_spanning_questions_for_lecture(
         logger.info(f"Fetched {len(all_segments)} segments for lecture.")
     except Exception as e:
         logger.error(f"Error fetching segments: {e}")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     logger.info("Finding relevant entities...")
     try:
@@ -218,7 +228,7 @@ def generate_multi_entity_spanning_questions_for_lecture(
 
     except Exception as e:
         logger.error(f"Error finding entities: {e}")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     for entity in entities_to_process:
         if len(entity.name) > 80:
@@ -233,7 +243,8 @@ def generate_multi_entity_spanning_questions_for_lecture(
             # Create allowlist from ALL relevant entities found (Top A)
             allowed_names = {e.name.lower() for e in all_entities}
             
-            questions = create_multi_entity_segment_spanning_question(
+            # create_multi_entity_segment_spanning_question now returns (questions, stats)
+            questions, stats = create_multi_entity_segment_spanning_question(
                 all_segments,
                 entity.name,
                 max_definition_words=max_definition_words,
@@ -242,6 +253,9 @@ def generate_multi_entity_spanning_questions_for_lecture(
                 allowed_related_entities=allowed_names,
                 max_mentioned_spans=1,
             )
+            
+            total_input_words += stats.get("input_words", 0)
+            total_output_words += stats.get("output_words", 0)
 
             for q in questions:
                 evaluation = q.get("evaluation", {})
@@ -267,6 +281,8 @@ def generate_multi_entity_spanning_questions_for_lecture(
                 f"Error generating multi-entity questions for entity {entity.name}: {e}"
             )
             continue
+
+    return {"input_words": total_input_words, "output_words": total_output_words}
 
 
 def main(

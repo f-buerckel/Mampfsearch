@@ -34,6 +34,11 @@ EVALUATION_CRITERIA = (
 )
 
 
+def _word_count(text: str) -> int:
+    return len(re.findall(r"\S+", text or ""))
+
+
+
 def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
     # Returns either none if not all keys are present or the parsed dict.
 
@@ -87,7 +92,7 @@ def evaluate_dataset(input_file: str, output_file: str):
         df = pd.read_csv(input_file)
     except FileNotFoundError:
         print("CSV file not found.")
-        return
+        return {"input_words": 0, "output_words": 0}
 
     print(f"Starting evaluation of {len(df)} rows with QG-Eval criteria...")
 
@@ -97,6 +102,9 @@ def evaluate_dataset(input_file: str, output_file: str):
         output_columns.append(f"{criteria_name}_score")
         output_columns.append(f"{criteria_name}_reason")
     output_columns.append("eval_error")
+
+    total_input_words = 0
+    total_output_words = 0
 
     # Start fresh by removing an existing output file.
     if os.path.exists(output_file):
@@ -143,6 +151,10 @@ def evaluate_dataset(input_file: str, output_file: str):
                 ],
             )
             content = response.choices[0].message.content
+            
+            total_input_words += _word_count(prompt)
+            total_output_words += _word_count(content)
+            
             eval_data = parse_llm_response(
                 response=content,
                 keys=EVALUATION_CRITERIA,
@@ -172,6 +184,8 @@ def evaluate_dataset(input_file: str, output_file: str):
 
     flush_buffer()
     print(f"Evaluation complete. Saved to {output_file}")
+    
+    return {"input_words": total_input_words, "output_words": total_output_words}
 
 
 if __name__ == "__main__":
