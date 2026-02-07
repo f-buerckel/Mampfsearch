@@ -175,11 +175,15 @@ def generate_unstructured_questions_for_lecture(
             )
             continue
 
-
 def generate_multi_entity_spanning_questions_for_lecture(
     lecture_name: str,
     writer,
     graph_storage,
+    max_definition_words: int = 500,
+    max_comention_words: int = 1500,
+    max_comention_entities: int = 5,
+    top_k_generation: int = 20,
+    top_a_allowlist: int = 50,
 ):
     logger.info(f"Processing lecture (multi-entity spanning): {lecture_name}")
     try:
@@ -202,15 +206,21 @@ def generate_multi_entity_spanning_questions_for_lecture(
 
     logger.info("Finding relevant entities...")
     try:
-        entities: List[MathEntityNode] = find_relevant_entities_in_lecture(
-            lecture_id=lecture_id, top_k=20
+        # Fetch larger set for allowlist (Top A)
+        all_entities: List[MathEntityNode] = find_relevant_entities_in_lecture(
+            lecture_id=lecture_id, top_k=top_a_allowlist
         )
-        logger.info(f"Found {len(entities)} entities.")
+        logger.info(f"Found {len(all_entities)} relevant entities (Top A={top_a_allowlist}).")
+
+        # Slice for generation (Top K)
+        entities_to_process = all_entities[:top_k_generation]
+        logger.info(f"Selected Top {len(entities_to_process)} for question generation.")
+
     except Exception as e:
         logger.error(f"Error finding entities: {e}")
         return
 
-    for entity in entities:
+    for entity in entities_to_process:
         if len(entity.name) > 80:
             logger.warning(
                 f"Skipping entity with name length {len(entity.name)} (likely transcription error): {entity.name[:50]}..."
@@ -220,9 +230,17 @@ def generate_multi_entity_spanning_questions_for_lecture(
         logger.info(f"Generating multi-entity questions for entity: {entity.name}")
 
         try:
+            # Create allowlist from ALL relevant entities found (Top A)
+            allowed_names = {e.name.lower() for e in all_entities}
+            
             questions = create_multi_entity_segment_spanning_question(
                 all_segments,
                 entity.name,
+                max_definition_words=max_definition_words,
+                max_comention_words=max_comention_words,
+                max_comention_entities=max_comention_entities,
+                allowed_related_entities=allowed_names,
+                max_mentioned_spans=1,
             )
 
             for q in questions:

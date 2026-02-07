@@ -1,7 +1,7 @@
 from mampfsearch.utils.config import get_graph_storage, get_llm_client
 from mampfsearch.utils.models import SegmentNode, MathEntity
 from mampfsearch.utils import prompts, config
-from typing import List, Optional, Dict, Iterable, Tuple
+from typing import List, Optional, Dict, Iterable, Tuple, Set
 
 import re
 import logging
@@ -56,6 +56,39 @@ def _build_separated_context_blocks(
     return "".join(rendered_parts).lstrip()
 
 
+def _group_and_format_segments(segments: List[SegmentNode], separator: str = "\n[...]\n") -> str:
+    """Group consecutive segments into paragraphs and separate non-consecutive ones.
+
+    Segments are considered consecutive if their positions are adjacent (diff == 1).
+    """
+    if not segments:
+        return ""
+
+    sorted_segments = sorted(segments, key=lambda s: s.segment.position)
+    
+    formatted_groups = []
+    current_group = []
+    
+    for seg in sorted_segments:
+        if not current_group:
+            current_group.append(seg)
+        else:
+            last_seg = current_group[-1]
+            if seg.segment.position == last_seg.segment.position + 1:
+                current_group.append(seg)
+            else:
+                # Close current group
+                group_text = " ".join([s.segment.text for s in current_group])
+                formatted_groups.append(group_text)
+                current_group = [seg]
+    
+    if current_group:
+        group_text = " ".join([s.segment.text for s in current_group])
+        formatted_groups.append(group_text)
+        
+    return separator.join(formatted_groups)
+
+
 def _get_bio_classification_label(labels: Iterable[str]) -> Optional[str]:
     for label in sorted(labels or []):
         lower = label.lower()
@@ -79,8 +112,13 @@ def create_multi_entity_segment_spanning_question(
     segments: List[SegmentNode],
     entity_name: str,
     n_questions_per_span: int = 3,
-    max_context_words: int = 6000,
+    max_context_words: int = 20000,
+    max_definition_words: int = 500,
+    max_comention_words: int = 1500,
+    max_comention_entities: int = 5,
     definition_label: str = "definition",
+    allowed_related_entities: Optional[Set[str]] = None,
+    max_mentioned_spans: int = 2,
 ):
     """Generate multi-entity spanning questions with enriched context.
 
@@ -96,6 +134,7 @@ def create_multi_entity_segment_spanning_question(
 
     target_lower = (entity_name or "").strip().lower()
     if not target_lower:
+        logger.warning(f"Skipping question generation: Invalid entity name '{entity_name}'")
         return []
 
     segments = sorted(segments, key=lambda s: s.segment.position)
@@ -148,21 +187,9 @@ def create_multi_entity_segment_spanning_question(
     if current_span:
         spans.append((current_type_lower or "", current_span))
 
-    valid_spans: List[Tuple[str, List[SegmentNode]]] = []
-    for span_type, span in spans:
-        if not span:
-            continue
-        about = (span[0].segment.about_entity or "").strip().lower()
-        if about and about == target_lower:
-            valid_spans.append((span_type, span))
-
-    if not valid_spans:
-        return []
-
-    llm_client = get_llm_client()
     graph_storage = get_graph_storage()
 
-    # Pre-fetch mentioned entity names per segment for efficient co-mention filtering.
+    # Pre-fetch mentioned entity names per segment for efficient filtering.
     try:
         mentions_by_segment_id = graph_storage.get_entity_mentions_for_segments(
             all_segment_ids
@@ -171,6 +198,50 @@ def create_multi_entity_segment_spanning_question(
         logger.error(f"Failed to fetch entity mentions for segments: {e}")
         mentions_by_segment_id = {}
 
+    import random
+
+    # Separate spans into 'about' and 'mentioned'
+    about_spans = []
+    mentioned_spans = []
+
+    for span_type, span in spans:
+        if not span:
+            continue
+        
+        # Check if span is about target
+        is_about_target = (span[0].segment.about_entity or "").strip().lower() == target_lower
+        
+        if is_about_target:
+            about_spans.append((span_type, span))
+        else:
+            # Check if target is mentioned
+            is_mentioned = False
+            for s in span:
+                if target_lower in mentions_by_segment_id.get(s.graph_id, set()):
+                    is_mentioned = True
+                    break
+            
+            if is_mentioned:
+                mentioned_spans.append((span_type, span))
+
+    # Sample mentioned spans if needed
+    if len(mentioned_spans) > max_mentioned_spans:
+        logger.info(f"Sampling {max_mentioned_spans} mentioned spans from {len(mentioned_spans)} total.")
+        mentioned_spans = random.sample(mentioned_spans, max_mentioned_spans)
+    
+    # Combine valid spans
+    valid_spans = about_spans + mentioned_spans
+
+    # Performance Logging
+    logger.info(f"Entity '{entity_name}': Found {len(valid_spans)} valid spans "
+                f"({len(about_spans)} 'about', {len(mentioned_spans)} 'mentioned').")
+
+    if not valid_spans:
+        logger.info(f"No valid spans found for entity '{entity_name}' (target_lower='{target_lower}'). "
+                    f"This entity is neither the subject nor mentioned in any segment.")
+        return []
+
+    llm_client = get_llm_client()
     questions = []
 
     for span_type, span in valid_spans:
@@ -189,12 +260,40 @@ def create_multi_entity_segment_spanning_question(
             name_lower = name.lower()
             if name_lower == target_lower:
                 continue
+
+            # Filter non-allowed entities if allowlist is provided
+            if allowed_related_entities is not None:
+                 if name_lower not in allowed_related_entities:
+                     continue
+
             # Keep a stable original casing for display
             related_entities[name_lower] = name
             if ent.description:
                 descriptions[name] = ent.description
 
-        other_entities_list = sorted(related_entities.values(), key=lambda s: s.lower())
+        # 1. Filter related entities based on co-mention frequency
+        # Count co-mentions for each related entity
+        comention_counts = {}
+        for related_lower in related_entities.keys():
+            count = 0
+            for s in segments:
+                mentioned = mentions_by_segment_id.get(s.graph_id, set())
+                if target_lower in mentioned and related_lower in mentioned:
+                    count += 1
+            comention_counts[related_lower] = count
+        
+        # Sort by count (descending), then name (ascending) for stability
+        sorted_related_keys = sorted(
+            related_entities.keys(),
+            key=lambda k: (-comention_counts.get(k, 0), k)
+        )
+        
+        # Keep top K
+        top_k_keys = sorted_related_keys[:max_comention_entities]
+                
+        other_entities_list = [related_entities[k] for k in top_k_keys]
+        # Sort alphabetically for display in the prompt list
+        other_entities_list.sort(key=lambda s: s.lower())
 
         mentioned_entities_block = (
             "\n".join([f"- {n}" for n in other_entities_list])
@@ -203,7 +302,7 @@ def create_multi_entity_segment_spanning_question(
         )
 
         description_text = "\n".join(
-            [f"{name}: {desc}" for name, desc in descriptions.items()]
+            [f"{related_entities[k]}: {descriptions.get(related_entities[k], '')}" for k in top_k_keys if descriptions.get(related_entities[k])]
         )
 
         blocks: List[Tuple[str, str]] = [
@@ -213,29 +312,50 @@ def create_multi_entity_segment_spanning_question(
         if description_text.strip():
             blocks.append(("Related Entity Descriptions", description_text))
 
-        # Add definition + co-mention contexts for each related entity
-        for related_lower, related_name in sorted(related_entities.items()):
-            # Definition segments about the related entity (case-insensitive)
-            def_segments = [
-                s
-                for s in segments
-                if (s.segment.about_entity or "").strip().lower() == related_lower
-                and _has_classification_label(s, definition_label)
-            ]
+        # Consolidate Definition + Co-mention contexts
+        
+        # Track seen segments to avoid duplication across blocks
+        seen_segment_ids = set()
+        
+        # Mark main span segments as seen
+        for s in span:
+            seen_segment_ids.add(s.graph_id)
+
+        # Iterate only over the filtered top K entities
+        for related_lower in top_k_keys:
+            related_name = related_entities[related_lower]
+            
+            # 1. Definition segments
+            def_segments = []
+            for s in segments:
+                if (s.segment.about_entity or "").strip().lower() == related_lower and _has_classification_label(s, definition_label):
+                    if s.graph_id not in seen_segment_ids:
+                        def_segments.append(s)
+                        seen_segment_ids.add(s.graph_id)
+
             def_segments.sort(key=lambda s: s.segment.position)
             if def_segments:
-                def_text = "\n".join([s.segment.text for s in def_segments])
+                def_text = _group_and_format_segments(def_segments)
+                # Truncate definition text
+                def_text = _truncate_to_word_limit(def_text, max_definition_words)
                 blocks.append((f"Definition Context — {related_name}", def_text))
 
-            # Co-mention segments: mention BOTH target and related entity (case-insensitive)
-            comention_segments: List[SegmentNode] = []
+            # 2. Co-mention segments (separate blocks per entity, strictly deduplicated)
+            comention_segments = []
             for s in segments:
                 mentioned = mentions_by_segment_id.get(s.graph_id, set())
                 if target_lower in mentioned and related_lower in mentioned:
-                    comention_segments.append(s)
+                    if s.graph_id not in seen_segment_ids:
+                        comention_segments.append(s)
+                        seen_segment_ids.add(s.graph_id)
+            
+            
             comention_segments.sort(key=lambda s: s.segment.position)
             if comention_segments:
-                comention_text = "\n".join([s.segment.text for s in comention_segments])
+                # Use coherent grouping
+                comention_text = _group_and_format_segments(comention_segments)
+                # Truncate co-mention text
+                comention_text = _truncate_to_word_limit(comention_text, max_comention_words)
                 blocks.append(
                     (
                         f"Co-mention Context — {entity_name} + {related_name}",
@@ -273,10 +393,14 @@ def create_multi_entity_segment_spanning_question(
             response_content = response.choices[0].message.content
             response_dict = parse_llm_response(
                 response=response_content,
-                keys=("questions", "answers", "explanations"),
+                keys=("reasoning", "blooms_level", "questions", "answers", "explanations"),
             )
             if not response_dict:
                 continue
+
+            reasoning = response_dict.get("reasoning", "")
+            blooms_level = response_dict.get("blooms_level", 0)
+            logger.info(f"Generated questions with Bloom's Level {blooms_level}. Reasoning: {reasoning}")
 
             generated_questions = response_dict.get("questions") or []
             generated_answers = response_dict.get("answers") or []
@@ -580,10 +704,13 @@ def create_multiple_segment_spanning_question(
             response_content = response.choices[0].message.content
             response_dict = parse_llm_response(
                 response=response_content,
-                keys=("questions", "answers", "explanations"),
+                keys=("reasoning", "blooms_level", "questions", "answers", "explanations"),
             )
             if response_dict:
                 logger.debug(f"Spanning Question Prompt:\n{full_context}")
+                reasoning = response_dict.get("reasoning") or "No reasoning provided."
+                blooms_level = response_dict.get("blooms_level", 0)
+                logger.info(f"Generated questions with Bloom's Level {blooms_level}. Reasoning: {reasoning}")
                 generated_questions = response_dict.get("questions") or []
                 generated_answers = response_dict.get("answers") or []
                 generated_explanations = response_dict.get("explanations") or []

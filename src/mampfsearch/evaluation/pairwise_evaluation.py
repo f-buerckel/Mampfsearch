@@ -330,6 +330,482 @@ def judge_pair(
     return {"winner": winner, "reasoning": reasoning}, None, content
 
 
+def run_pairwise_evaluation(
+    csv_a: str,
+    csv_b: str,
+    name_a: str = "A",
+    name_b: str = "B",
+    n_pairs: int = 100,
+    match_on: str = "none",
+    seed: int = 0,
+    context_words: int = 1200,
+    model: str = "openai/gpt-oss-20b",
+    temperature: float = 0.0,
+    max_tokens: int = 100000,
+    debug_invalid: bool = False,
+    debug_invalid_dir: Optional[str] = None,
+    sleep: float = 0.0,
+    output: Optional[str] = None,
+) -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    if n_pairs <= 0:
+        raise ValueError("--n-pairs must be > 0")
+
+    df_a = pd.read_csv(csv_a)
+    df_b = pd.read_csv(csv_b)
+
+    # Normalize NaNs so we don't accidentally treat them as non-empty strings like 'nan'.
+    for df in (df_a, df_b):
+        for col in ("lecture_name", "entity_name", "context", "question", "answer"):
+            if col in df.columns:
+                df[col] = df[col].fillna("")
+
+    required_cols = ["lecture_name", "entity_name", "context", "question", "answer"]
+    _require_columns(df_a, required_cols, csv_a)
+    _require_columns(df_b, required_cols, csv_b)
+
+    # Basic cleanup: drop empty Q/A
+    def _nonempty(s: Any) -> bool:
+        # After fillna(""), this treats empty/whitespace-only as empty.
+        return bool(str(s).strip())
+
+    df_a = df_a[
+        df_a["question"].apply(_nonempty) & df_a["answer"].apply(_nonempty)
+    ].copy()
+    df_b = df_b[
+        df_b["question"].apply(_nonempty) & df_b["answer"].apply(_nonempty)
+    ].copy()
+
+    if df_a.empty or df_b.empty:
+        raise ValueError(
+            "One of the inputs has no non-empty question/answer rows after filtering."
+        )
+
+    rng = random.Random(seed)
+    if match_on == "none":
+        sampled_pairs = _sample_pairs_none(df_a, df_b, n_pairs, rng)
+    else:
+        sampled_pairs = _sample_pairs_match(
+            df_a, df_b, n_pairs, rng, match_on
+        )
+
+    os.makedirs("Results", exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if output:
+        output_path = output
+    else:
+        output_path = os.path.join(
+            "Results", f"{stamp}_pairwise_{name_a}_vs_{name_b}.csv"
+        )
+
+    output_dir = os.path.dirname(str(output_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    is_json_output = str(output_path).lower().endswith(".json")
+
+    # wins_a / wins_b refer to the input datasets (name_a / name_b),
+    # not to the anonymous A/B labels shown to the model.
+    wins_a = 0
+    wins_b = 0
+    ties = 0
+    invalid = 0
+
+    metadata = {
+        "csv_a": csv_a,
+        "csv_b": csv_b,
+        "name_a": name_a,
+        "name_b": name_b,
+        "n_pairs": len(sampled_pairs),
+        "match_on": match_on,
+        "seed": seed,
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "context_words": context_words,
+    }
+
+    logger.info(
+        f"Judging {len(sampled_pairs)} pairs (match_on={match_on}, model={model}, temperature={temperature})."
+    )
+
+    invalid_logged = 0
+    invalid_log_limit = len(sampled_pairs) if debug_invalid else 3
+
+    if debug_invalid_dir:
+        debug_invalid_dir = str(debug_invalid_dir)
+        os.makedirs(debug_invalid_dir, exist_ok=True)
+
+    def _dump_invalid(
+        pair_index: int, reason: Optional[str], prompt: str, raw: Optional[str]
+    ) -> Optional[str]:
+        if not debug_invalid_dir:
+            return None
+
+        safe_reason = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(reason or "unknown"))[:80]
+        path = os.path.join(
+            debug_invalid_dir, f"invalid_pair_{pair_index:04d}_{safe_reason}.txt"
+        )
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"pair={pair_index}\n")
+                f.write(f"reason={reason}\n")
+                f.write("\n--- PROMPT ---\n")
+                f.write(prompt)
+                f.write("\n\n--- RAW_RESPONSE ---\n")
+                f.write(raw or "")
+            return path
+        except Exception as e:
+            logger.warning(f"Failed writing invalid dump for pair {pair_index}: {e}")
+            return None
+
+    total_prompt_words = 0
+
+    if is_json_output:
+        # JSON output is buffered in-memory and written at the end.
+        matches: List[Dict[str, Any]] = []
+        for i, (idx_a, idx_b) in enumerate(sampled_pairs, 1):
+            row_a = df_a.loc[idx_a]
+            row_b = df_b.loc[idx_b]
+
+            cand_from_csv_a = _row_to_candidate(
+                row_a, name_a, idx_a, context_words
+            )
+            cand_from_csv_b = _row_to_candidate(
+                row_b, name_b, idx_b, context_words
+            )
+
+            cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
+
+            prompt = PAIRWISE_JUDGE_PROMPT.format(
+                lecture_a=cand_a.lecture_name,
+                question_a=cand_a.question,
+                answer_a=cand_a.answer,
+                lecture_b=cand_b.lecture_name,
+                question_b=cand_b.question,
+                answer_b=cand_b.answer,
+            )
+            total_prompt_words += _word_count(prompt)
+
+            invalid_reason = None
+            raw_response_snippet = None
+            try:
+                decision, invalid_reason, raw_response = judge_pair(
+                    candidate_a=cand_a,
+                    candidate_b=cand_b,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                if raw_response:
+                    raw_response_snippet = (raw_response or "").strip()[:800]
+            except Exception as e:
+                logger.warning(f"LLM error on pair {i}: {e}")
+                invalid_reason = str(e)
+                decision = None
+
+            if not decision:
+                invalid += 1
+                if invalid_logged < invalid_log_limit:
+                    invalid_logged += 1
+                    logger.warning(
+                        "Invalid LLM response on pair %s (%s). Raw (first 1200 chars):\n%s",
+                        i,
+                        invalid_reason,
+                        (raw_response or "").strip()[:1200],
+                    )
+                dump_path = _dump_invalid(i, invalid_reason, prompt, raw_response)
+                if dump_path:
+                    logger.warning(f"Wrote invalid debug dump: {dump_path}")
+                matches.append(
+                    {
+                        "pair": i,
+                        "winner": None,
+                        # Store raw model output (if any) in reasoning for debugging.
+                        "reasoning": raw_response_snippet,
+                        "a": {
+                            "source": cand_a.source,
+                            "row_index": cand_a.row_index,
+                            "lecture_name": cand_a.lecture_name,
+                            "entity_name": cand_a.entity_name,
+                            "question": cand_a.question,
+                            "answer": cand_a.answer,
+                        },
+                        "b": {
+                            "source": cand_b.source,
+                            "row_index": cand_b.row_index,
+                            "lecture_name": cand_b.lecture_name,
+                            "entity_name": cand_b.entity_name,
+                            "question": cand_b.question,
+                            "answer": cand_b.answer,
+                        },
+                        "error": "invalid_or_unparseable_llm_response",
+                        "invalid_reason": invalid_reason,
+                    }
+                )
+            else:
+                winner = decision["winner"]
+                if winner in {"A", "B"}:
+                    winner_source = cand_a.source if winner == "A" else cand_b.source
+                    if winner_source == name_a:
+                        wins_a += 1
+                    elif winner_source == name_b:
+                        wins_b += 1
+                else:
+                    ties += 1
+
+                matches.append(
+                    {
+                        "pair": i,
+                        "winner": winner,
+                        "reasoning": decision["reasoning"],
+                        "a": {
+                            "source": cand_a.source,
+                            "row_index": cand_a.row_index,
+                            "lecture_name": cand_a.lecture_name,
+                            "entity_name": cand_a.entity_name,
+                            "question": cand_a.question,
+                            "answer": cand_a.answer,
+                        },
+                        "b": {
+                            "source": cand_b.source,
+                            "row_index": cand_b.row_index,
+                            "lecture_name": cand_b.lecture_name,
+                            "entity_name": cand_b.entity_name,
+                            "question": cand_b.question,
+                            "answer": cand_b.answer,
+                        },
+                    }
+                )
+
+            if sleep and sleep > 0:
+                time.sleep(sleep)
+
+            if i % 5 == 0 or i == len(sampled_pairs):
+                logger.info(
+                    f"Processed {i}/{len(sampled_pairs)} | {name_a} wins={wins_a} | {name_b} wins={wins_b} | ties={ties} | invalid={invalid}"
+                )
+
+        summary = {
+            "wins_a": wins_a,
+            "wins_b": wins_b,
+            "ties": ties,
+            "invalid": invalid,
+        }
+        result = {
+            "metadata": metadata,
+            "summary": summary,
+            "matches": matches,
+        }
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        print(f"Total prompt word count (all pairs): {total_prompt_words}")
+        logger.info(f"Saved pairwise results to {output_path}")
+        return
+
+    summary = {
+        "wins_a": wins_a,
+        "wins_b": wins_b,
+        "ties": ties,
+        "invalid": invalid,
+    }
+
+    # CSV output (default): stream rows as we go so partial runs produce usable files.
+    summary_path = re.sub(r"\.csv$", "_summary.csv", output_path, flags=re.IGNORECASE)
+
+    def _write_summary() -> None:
+        summary_row = {**metadata, **summary}
+        pd.DataFrame([summary_row]).to_csv(summary_path, index=False)
+
+    fieldnames = [
+        "pair",
+        "winner",
+        "reasoning",
+        "a_source",
+        "a_row_index",
+        "a_lecture_name",
+        "a_question",
+        "a_answer",
+        "b_source",
+        "b_row_index",
+        "b_lecture_name",
+        "b_question",
+        "b_answer",
+        "error",
+        "invalid_reason",
+    ]
+
+    # Stream match CSV. Also keep a small in-memory list ONLY for JSON mode.
+    # Here, for CSV mode, we write each row immediately.
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        f.flush()
+
+        try:
+            for i, (idx_a, idx_b) in enumerate(sampled_pairs, 1):
+                row_a = df_a.loc[idx_a]
+                row_b = df_b.loc[idx_b]
+
+                cand_from_csv_a = _row_to_candidate(
+                    row_a, name_a, idx_a, context_words
+                )
+                cand_from_csv_b = _row_to_candidate(
+                    row_b, name_b, idx_b, context_words
+                )
+
+                cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
+
+                prompt = PAIRWISE_JUDGE_PROMPT.format(
+                    lecture_a=cand_a.lecture_name,
+                    question_a=cand_a.question,
+                    answer_a=cand_a.answer,
+                    lecture_b=cand_b.lecture_name,
+                    question_b=cand_b.question,
+                    answer_b=cand_b.answer,
+                )
+                total_prompt_words += _word_count(prompt)
+
+                invalid_reason = None
+                raw_response_snippet = None
+                try:
+                    decision, invalid_reason, raw_response = judge_pair(
+                        candidate_a=cand_a,
+                        candidate_b=cand_b,
+                        model=model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                    if raw_response:
+                        raw_response_snippet = (raw_response or "").strip()[:800]
+                except Exception as e:
+                    logger.warning(f"LLM error on pair {i}: {e}")
+                    invalid_reason = str(e)
+                    decision = None
+
+                if not decision:
+                    invalid += 1
+                    if invalid_logged < invalid_log_limit:
+                        invalid_logged += 1
+                        logger.warning(
+                            "Invalid LLM response on pair %s (%s). Raw (first 1200 chars):\n%s",
+                            i,
+                            invalid_reason,
+                            (raw_response or "").strip()[:1200],
+                        )
+                    dump_path = _dump_invalid(i, invalid_reason, prompt, raw_response)
+                    if dump_path:
+                        logger.warning(f"Wrote invalid debug dump: {dump_path}")
+                    match: Dict[str, Any] = {
+                        "pair": i,
+                        "winner": None,
+                        "reasoning": raw_response_snippet,
+                        "a": {
+                            "source": cand_a.source,
+                            "row_index": cand_a.row_index,
+                            "lecture_name": cand_a.lecture_name,
+                            "entity_name": cand_a.entity_name,
+                            "question": cand_a.question,
+                            "answer": cand_a.answer,
+                        },
+                        "b": {
+                            "source": cand_b.source,
+                            "row_index": cand_b.row_index,
+                            "lecture_name": cand_b.lecture_name,
+                            "entity_name": cand_b.entity_name,
+                            "question": cand_b.question,
+                            "answer": cand_b.answer,
+                        },
+                        "error": "invalid_or_unparseable_llm_response",
+                        "invalid_reason": invalid_reason,
+                    }
+                    winner_ab = None
+                else:
+                    winner = decision["winner"]
+                    if winner in {"A", "B"}:
+                        winner_source = cand_a.source if winner == "A" else cand_b.source
+                        if winner_source == name_a:
+                            wins_a += 1
+                        elif winner_source == name_b:
+                            wins_b += 1
+                    else:
+                        ties += 1
+
+                    winner_ab = winner
+
+                    match = {
+                        "pair": i,
+                        "winner": winner,
+                        "reasoning": decision["reasoning"],
+                        "a": {
+                            "source": cand_a.source,
+                            "row_index": cand_a.row_index,
+                            "lecture_name": cand_a.lecture_name,
+                            "entity_name": cand_a.entity_name,
+                            "question": cand_a.question,
+                            "answer": cand_a.answer,
+                        },
+                        "b": {
+                            "source": cand_b.source,
+                            "row_index": cand_b.row_index,
+                            "lecture_name": cand_b.lecture_name,
+                            "entity_name": cand_b.entity_name,
+                            "question": cand_b.question,
+                            "answer": cand_b.answer,
+                        },
+                    }
+
+                # Write row immediately
+                row_dict = {
+                    "pair": i,
+                    "winner": match.get("winner") if winner_ab == "TIE" else (
+                         match["a"]["source"] if winner_ab == "A" else (match["b"]["source"] if winner_ab == "B" else None)
+                    ),
+                    "reasoning": match.get("reasoning"),
+                    "a_source": match["a"].get("source", name_a),
+                    "a_row_index": match["a"].get("row_index"),
+                    "a_lecture_name": match["a"].get("lecture_name"),
+                    "a_question": match["a"].get("question"),
+                    "a_answer": match["a"].get("answer"),
+                    "b_source": match["b"].get("source", name_b),
+                    "b_row_index": match["b"].get("row_index"),
+                    "b_lecture_name": match["b"].get("lecture_name"),
+                    "b_question": match["b"].get("question"),
+                    "b_answer": match["b"].get("answer"),
+                    "error": match.get("error"),
+                    "invalid_reason": match.get("invalid_reason"),
+                }
+                # Fix winner field logic above which was slightly broken/complex in dict comprehension:
+                # Let's just correct it:
+                if winner_ab == "A":
+                    row_dict["winner"] = cand_a.source
+                elif winner_ab == "B":
+                    row_dict["winner"] = cand_b.source
+                elif winner_ab == "TIE":
+                    row_dict["winner"] = "TIE"
+                else:
+                    row_dict["winner"] = None
+
+                writer.writerow(row_dict)
+                f.flush()
+
+                if sleep and sleep > 0:
+                    time.sleep(sleep)
+
+                if i % 5 == 0 or i == len(sampled_pairs):
+                    logger.info(
+                        f"Processed {i}/{len(sampled_pairs)} | {name_a} wins={wins_a} | {name_b} wins={wins_b} | ties={ties} | invalid={invalid}"
+                    )
+
+        except KeyboardInterrupt:
+            logger.warning("Interrupted! Saving summary so far...")
+
+    _write_summary()
+    print(f"Total prompt word count (all pairs): {total_prompt_words}")
+    logger.info(f"Saved pairwise results to {output_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -392,486 +868,24 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-
-    logging.basicConfig(level=logging.INFO)
-
-    if args.n_pairs <= 0:
-        raise ValueError("--n-pairs must be > 0")
-
-    df_a = pd.read_csv(args.csv_a)
-    df_b = pd.read_csv(args.csv_b)
-
-    # Normalize NaNs so we don't accidentally treat them as non-empty strings like 'nan'.
-    for df in (df_a, df_b):
-        for col in ("lecture_name", "entity_name", "context", "question", "answer"):
-            if col in df.columns:
-                df[col] = df[col].fillna("")
-
-    required_cols = ["lecture_name", "entity_name", "context", "question", "answer"]
-    _require_columns(df_a, required_cols, args.csv_a)
-    _require_columns(df_b, required_cols, args.csv_b)
-
-    # Basic cleanup: drop empty Q/A
-    def _nonempty(s: Any) -> bool:
-        # After fillna(""), this treats empty/whitespace-only as empty.
-        return bool(str(s).strip())
-
-    df_a = df_a[
-        df_a["question"].apply(_nonempty) & df_a["answer"].apply(_nonempty)
-    ].copy()
-    df_b = df_b[
-        df_b["question"].apply(_nonempty) & df_b["answer"].apply(_nonempty)
-    ].copy()
-
-    if df_a.empty or df_b.empty:
-        raise ValueError(
-            "One of the inputs has no non-empty question/answer rows after filtering."
-        )
-
-    rng = random.Random(args.seed)
-    if args.match_on == "none":
-        sampled_pairs = _sample_pairs_none(df_a, df_b, args.n_pairs, rng)
-    else:
-        sampled_pairs = _sample_pairs_match(
-            df_a, df_b, args.n_pairs, rng, args.match_on
-        )
-
-    os.makedirs("Results", exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if args.output:
-        output_path = args.output
-    else:
-        output_path = os.path.join(
-            "Results", f"{stamp}_pairwise_{args.name_a}_vs_{args.name_b}.csv"
-        )
-
-    output_dir = os.path.dirname(str(output_path))
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-
-    is_json_output = str(output_path).lower().endswith(".json")
-
-    # wins_a / wins_b refer to the input datasets (args.name_a / args.name_b),
-    # not to the anonymous A/B labels shown to the model.
-    wins_a = 0
-    wins_b = 0
-    ties = 0
-    invalid = 0
-
-    metadata = {
-        "csv_a": args.csv_a,
-        "csv_b": args.csv_b,
-        "name_a": args.name_a,
-        "name_b": args.name_b,
-        "n_pairs": len(sampled_pairs),
-        "match_on": args.match_on,
-        "seed": args.seed,
-        "model": args.model,
-        "temperature": args.temperature,
-        "max_tokens": args.max_tokens,
-        "context_words": args.context_words,
-    }
-
-    logger.info(
-        f"Judging {len(sampled_pairs)} pairs (match_on={args.match_on}, model={args.model}, temperature={args.temperature})."
+    
+    run_pairwise_evaluation(
+        csv_a=args.csv_a,
+        csv_b=args.csv_b,
+        name_a=args.name_a,
+        name_b=args.name_b,
+        n_pairs=args.n_pairs,
+        match_on=args.match_on,
+        seed=args.seed,
+        context_words=args.context_words,
+        model=args.model,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+        debug_invalid=args.debug_invalid,
+        debug_invalid_dir=args.debug_invalid_dir,
+        sleep=args.sleep,
+        output=args.output,
     )
-
-    invalid_logged = 0
-    invalid_log_limit = len(sampled_pairs) if args.debug_invalid else 3
-
-    debug_invalid_dir = None
-    if args.debug_invalid_dir:
-        debug_invalid_dir = str(args.debug_invalid_dir)
-        os.makedirs(debug_invalid_dir, exist_ok=True)
-
-    def _dump_invalid(
-        pair_index: int, reason: Optional[str], prompt: str, raw: Optional[str]
-    ) -> Optional[str]:
-        if not debug_invalid_dir:
-            return None
-
-        safe_reason = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(reason or "unknown"))[:80]
-        path = os.path.join(
-            debug_invalid_dir, f"invalid_pair_{pair_index:04d}_{safe_reason}.txt"
-        )
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(f"pair={pair_index}\n")
-                f.write(f"reason={reason}\n")
-                f.write("\n--- PROMPT ---\n")
-                f.write(prompt)
-                f.write("\n\n--- RAW_RESPONSE ---\n")
-                f.write(raw or "")
-            return path
-        except Exception as e:
-            logger.warning(f"Failed writing invalid dump for pair {pair_index}: {e}")
-            return None
-
-    total_prompt_words = 0
-
-    if is_json_output:
-        # JSON output is buffered in-memory and written at the end.
-        matches: List[Dict[str, Any]] = []
-        for i, (idx_a, idx_b) in enumerate(sampled_pairs, 1):
-            row_a = df_a.loc[idx_a]
-            row_b = df_b.loc[idx_b]
-
-            cand_from_csv_a = _row_to_candidate(
-                row_a, args.name_a, idx_a, args.context_words
-            )
-            cand_from_csv_b = _row_to_candidate(
-                row_b, args.name_b, idx_b, args.context_words
-            )
-
-            cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
-
-            prompt = PAIRWISE_JUDGE_PROMPT.format(
-                lecture_a=cand_a.lecture_name,
-                question_a=cand_a.question,
-                answer_a=cand_a.answer,
-                lecture_b=cand_b.lecture_name,
-                question_b=cand_b.question,
-                answer_b=cand_b.answer,
-            )
-            total_prompt_words += _word_count(prompt)
-
-            invalid_reason = None
-            raw_response_snippet = None
-            try:
-                decision, invalid_reason, raw_response = judge_pair(
-                    candidate_a=cand_a,
-                    candidate_b=cand_b,
-                    model=args.model,
-                    temperature=args.temperature,
-                    max_tokens=args.max_tokens,
-                )
-                if raw_response:
-                    raw_response_snippet = (raw_response or "").strip()[:800]
-            except Exception as e:
-                logger.warning(f"LLM error on pair {i}: {e}")
-                invalid_reason = str(e)
-                decision = None
-
-            if not decision:
-                invalid += 1
-                if invalid_logged < invalid_log_limit:
-                    invalid_logged += 1
-                    logger.warning(
-                        "Invalid LLM response on pair %s (%s). Raw (first 1200 chars):\n%s",
-                        i,
-                        invalid_reason,
-                        (raw_response or "").strip()[:1200],
-                    )
-                dump_path = _dump_invalid(i, invalid_reason, prompt, raw_response)
-                if dump_path:
-                    logger.warning(f"Wrote invalid debug dump: {dump_path}")
-                matches.append(
-                    {
-                        "pair": i,
-                        "winner": None,
-                        # Store raw model output (if any) in reasoning for debugging.
-                        "reasoning": raw_response_snippet,
-                        "a": {
-                            "source": cand_a.source,
-                            "row_index": cand_a.row_index,
-                            "lecture_name": cand_a.lecture_name,
-                            "entity_name": cand_a.entity_name,
-                            "question": cand_a.question,
-                            "answer": cand_a.answer,
-                        },
-                        "b": {
-                            "source": cand_b.source,
-                            "row_index": cand_b.row_index,
-                            "lecture_name": cand_b.lecture_name,
-                            "entity_name": cand_b.entity_name,
-                            "question": cand_b.question,
-                            "answer": cand_b.answer,
-                        },
-                        "error": "invalid_or_unparseable_llm_response",
-                        "invalid_reason": invalid_reason,
-                    }
-                )
-            else:
-                winner = decision["winner"]
-                if winner in {"A", "B"}:
-                    winner_source = cand_a.source if winner == "A" else cand_b.source
-                    if winner_source == args.name_a:
-                        wins_a += 1
-                    elif winner_source == args.name_b:
-                        wins_b += 1
-                else:
-                    ties += 1
-
-                matches.append(
-                    {
-                        "pair": i,
-                        "winner": winner,
-                        "reasoning": decision["reasoning"],
-                        "a": {
-                            "source": cand_a.source,
-                            "row_index": cand_a.row_index,
-                            "lecture_name": cand_a.lecture_name,
-                            "entity_name": cand_a.entity_name,
-                            "question": cand_a.question,
-                            "answer": cand_a.answer,
-                        },
-                        "b": {
-                            "source": cand_b.source,
-                            "row_index": cand_b.row_index,
-                            "lecture_name": cand_b.lecture_name,
-                            "entity_name": cand_b.entity_name,
-                            "question": cand_b.question,
-                            "answer": cand_b.answer,
-                        },
-                    }
-                )
-
-            if args.sleep and args.sleep > 0:
-                time.sleep(args.sleep)
-
-            if i % 5 == 0 or i == len(sampled_pairs):
-                logger.info(
-                    f"Processed {i}/{len(sampled_pairs)} | {args.name_a} wins={wins_a} | {args.name_b} wins={wins_b} | ties={ties} | invalid={invalid}"
-                )
-
-        summary = {
-            "wins_a": wins_a,
-            "wins_b": wins_b,
-            "ties": ties,
-            "invalid": invalid,
-        }
-        result = {
-            "metadata": metadata,
-            "summary": summary,
-            "matches": matches,
-        }
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-        print(f"Total prompt word count (all pairs): {total_prompt_words}")
-        logger.info(f"Saved pairwise results to {output_path}")
-        return
-
-    summary = {
-        "wins_a": wins_a,
-        "wins_b": wins_b,
-        "ties": ties,
-        "invalid": invalid,
-    }
-
-    # CSV output (default): stream rows as we go so partial runs produce usable files.
-    summary_path = re.sub(r"\.csv$", "_summary.csv", output_path, flags=re.IGNORECASE)
-
-    def _write_summary() -> None:
-        summary_row = {**metadata, **summary}
-        pd.DataFrame([summary_row]).to_csv(summary_path, index=False)
-
-    fieldnames = [
-        "pair",
-        "winner",
-        "reasoning",
-        "a_source",
-        "a_row_index",
-        "a_lecture_name",
-        "a_question",
-        "a_answer",
-        "b_source",
-        "b_row_index",
-        "b_lecture_name",
-        "b_question",
-        "b_answer",
-        "error",
-        "invalid_reason",
-    ]
-
-    def _match_to_row(m: Dict[str, Any]) -> Dict[str, Any]:
-        a = m.get("a") or {}
-        b = m.get("b") or {}
-
-        winner_ab = m.get("winner")
-        if winner_ab == "A":
-            winner_resolved = a.get("source", args.name_a)
-        elif winner_ab == "B":
-            winner_resolved = b.get("source", args.name_b)
-        else:
-            winner_resolved = winner_ab
-        return {
-            "pair": m.get("pair"),
-            "winner": winner_resolved,
-            "reasoning": m.get("reasoning"),
-            "a_source": a.get("source", args.name_a),
-            "a_row_index": a.get("row_index"),
-            "a_lecture_name": a.get("lecture_name"),
-            "a_question": a.get("question"),
-            "a_answer": a.get("answer"),
-            "b_source": b.get("source", args.name_b),
-            "b_row_index": b.get("row_index"),
-            "b_lecture_name": b.get("lecture_name"),
-            "b_question": b.get("question"),
-            "b_answer": b.get("answer"),
-            "error": m.get("error"),
-            "invalid_reason": m.get("invalid_reason"),
-        }
-
-    # Stream match CSV. Also keep a small in-memory list ONLY for JSON mode.
-    # Here, for CSV mode, we write each row immediately.
-    with open(output_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        f.flush()
-
-        try:
-            for i, (idx_a, idx_b) in enumerate(sampled_pairs, 1):
-                row_a = df_a.loc[idx_a]
-                row_b = df_b.loc[idx_b]
-
-                cand_from_csv_a = _row_to_candidate(
-                    row_a, args.name_a, idx_a, args.context_words
-                )
-                cand_from_csv_b = _row_to_candidate(
-                    row_b, args.name_b, idx_b, args.context_words
-                )
-
-                cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
-
-                prompt = PAIRWISE_JUDGE_PROMPT.format(
-                    lecture_a=cand_a.lecture_name,
-                    question_a=cand_a.question,
-                    answer_a=cand_a.answer,
-                    lecture_b=cand_b.lecture_name,
-                    question_b=cand_b.question,
-                    answer_b=cand_b.answer,
-                )
-                total_prompt_words += _word_count(prompt)
-
-                invalid_reason = None
-                raw_response_snippet = None
-                try:
-                    decision, invalid_reason, raw_response = judge_pair(
-                        candidate_a=cand_a,
-                        candidate_b=cand_b,
-                        model=args.model,
-                        temperature=args.temperature,
-                        max_tokens=args.max_tokens,
-                    )
-                    if raw_response:
-                        raw_response_snippet = (raw_response or "").strip()[:800]
-                except Exception as e:
-                    logger.warning(f"LLM error on pair {i}: {e}")
-                    invalid_reason = str(e)
-                    decision = None
-
-                if not decision:
-                    invalid += 1
-                    if invalid_logged < invalid_log_limit:
-                        invalid_logged += 1
-                        logger.warning(
-                            "Invalid LLM response on pair %s (%s). Raw (first 1200 chars):\n%s",
-                            i,
-                            invalid_reason,
-                            (raw_response or "").strip()[:1200],
-                        )
-                    dump_path = _dump_invalid(i, invalid_reason, prompt, raw_response)
-                    if dump_path:
-                        logger.warning(f"Wrote invalid debug dump: {dump_path}")
-                    match: Dict[str, Any] = {
-                        "pair": i,
-                        "winner": None,
-                        "reasoning": raw_response_snippet,
-                        "a": {
-                            "source": cand_a.source,
-                            "row_index": cand_a.row_index,
-                            "lecture_name": cand_a.lecture_name,
-                            "entity_name": cand_a.entity_name,
-                            "question": cand_a.question,
-                            "answer": cand_a.answer,
-                        },
-                        "b": {
-                            "source": cand_b.source,
-                            "row_index": cand_b.row_index,
-                            "lecture_name": cand_b.lecture_name,
-                            "entity_name": cand_b.entity_name,
-                            "question": cand_b.question,
-                            "answer": cand_b.answer,
-                        },
-                        "error": "invalid_or_unparseable_llm_response",
-                        "invalid_reason": invalid_reason,
-                    }
-                else:
-                    winner = decision["winner"]
-                    if winner in {"A", "B"}:
-                        winner_source = (
-                            cand_a.source if winner == "A" else cand_b.source
-                        )
-                        if winner_source == args.name_a:
-                            wins_a += 1
-                        elif winner_source == args.name_b:
-                            wins_b += 1
-                    else:
-                        ties += 1
-
-                    match = {
-                        "pair": i,
-                        "winner": winner,
-                        "reasoning": decision["reasoning"],
-                        "a": {
-                            "source": cand_a.source,
-                            "row_index": cand_a.row_index,
-                            "lecture_name": cand_a.lecture_name,
-                            "entity_name": cand_a.entity_name,
-                            "question": cand_a.question,
-                            "answer": cand_a.answer,
-                        },
-                        "b": {
-                            "source": cand_b.source,
-                            "row_index": cand_b.row_index,
-                            "lecture_name": cand_b.lecture_name,
-                            "entity_name": cand_b.entity_name,
-                            "question": cand_b.question,
-                            "answer": cand_b.answer,
-                        },
-                        "error": None,
-                        "invalid_reason": None,
-                    }
-
-                # Write row immediately.
-                writer.writerow(_match_to_row(match))
-                f.flush()
-
-                # Update summary counters + persist summary frequently.
-                summary.update(
-                    {
-                        "wins_a": wins_a,
-                        "wins_b": wins_b,
-                        "ties": ties,
-                        "invalid": invalid,
-                    }
-                )
-                _write_summary()
-
-                if args.sleep and args.sleep > 0:
-                    time.sleep(args.sleep)
-
-                if i % 5 == 0 or i == len(sampled_pairs):
-                    logger.info(
-                        f"Processed {i}/{len(sampled_pairs)} | {args.name_a} wins={wins_a} | {args.name_b} wins={wins_b} | ties={ties} | invalid={invalid}"
-                    )
-
-        except KeyboardInterrupt:
-            logger.warning("Interrupted by user; writing partial summary.")
-            summary.update(
-                {
-                    "wins_a": wins_a,
-                    "wins_b": wins_b,
-                    "ties": ties,
-                    "invalid": invalid,
-                }
-            )
-            _write_summary()
-
-    logger.info(f"Saved pairwise matches to {output_path}")
-    logger.info(f"Saved pairwise summary to {summary_path}")
-    print(f"Total prompt word count (all pairs): {total_prompt_words}")
-
 
 if __name__ == "__main__":
     main()

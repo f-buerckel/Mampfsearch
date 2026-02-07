@@ -377,10 +377,13 @@ Your goal is to test whether a student can reason about "{entity}" *together wit
 2. **No Outside Knowledge**: Do NOT ask for proofs, calculations, or definitions that are far outside the scope of the provided context.
 
 **Multi-Entity Reasoning Requirement**:
-1. Each question MUST involve "{entity}" and if somehow possible at least ONE additional entity from: {other_entities}.
-2. The question must require reasoning across entities (e.g., connecting a definition of one entity to a property/usage of another), not mere mention.
+1. Each question MUST involve "{entity}" and context from a different block than the main text.
+2. The question must require reasoning across different context spans (e.g., connecting a definition of one entity to a property/usage of another), not mere mention.
 3. If possible, create questions that combine multiple concepts mentioned to test deeper understanding and generate questions that require deeper reasoning across the text, not just simple fact recall.
 
+**Cognitive Complexity Requirement**:
+1. You MUST generate questions that require analysis or evaluation of the provided content**.
+2. **AVOID** simple recall questions or basic understanding like "What is X?" or "Define Y", instead test the student's ability to reason about the material and require multiple steps of reasoning. 
 
 **Context Structure (IMPORTANT)**:
 - The context is separated into multiple blocks (e.g., Main Text, Related Entity Descriptions, Definition Context, Co-mention Context).
@@ -397,11 +400,16 @@ Your goal is to test whether a student can reason about "{entity}" *together wit
 - ALWAYS use valid LaTeX for mathematical symbols and equations (e.g., `\\mathbb{{R}}`, `\\epsilon > 0`).
 - Do NOT use Unicode math characters (use `\\in` not `∈`).
 
+**Chain of Thought (CoT) Requirement**:
+1. Before generating the questions, briefly explain the connection between "{entity}" and the other entity/entities involved.
+2. Identify the specific sentence or fact in the context that "bridges" the two concepts.
+
 Context:
 {context}
 
 Return the output in the following JSON format:
 {{
+  "reasoning": "Brief explanation of the connection between the entities based on the text and why this is a complex question structure.",
   "questions": ["..."],
   "answers": ["..."],
   "explanations": ["..."]

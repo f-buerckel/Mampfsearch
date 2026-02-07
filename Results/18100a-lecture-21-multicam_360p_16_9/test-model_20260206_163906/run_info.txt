@@ -1,0 +1,5 @@
+Lecture Name: 18100a-lecture-21-multicam_360p_16_9
+Model Name: test-model
+Timestamp: 20260206_163906
+Sentences Per Chunk: 10
+Questions Per Chunk: 5
