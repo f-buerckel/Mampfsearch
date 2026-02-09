@@ -1,5 +1,5 @@
 from mampfsearch.utils import prompts
-from mampfsearch.utils.config import get_llm_client
+from mampfsearch.utils import config
 import pandas as pd
 import json
 import time
@@ -36,7 +36,6 @@ EVALUATION_CRITERIA = (
 
 def _word_count(text: str) -> int:
     return len(re.findall(r"\S+", text or ""))
-
 
 
 def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
@@ -134,11 +133,11 @@ def evaluate_dataset(input_file: str, output_file: str):
             answer=row.get("answer", ""),
         )
 
-        llm_client = get_llm_client()
+        llm_client = config.get_llm_client()
 
         try:
             response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model=config.LLM_MODEL_NAME,
                 messages=[
                     {
                         "role": "system",
@@ -151,10 +150,10 @@ def evaluate_dataset(input_file: str, output_file: str):
                 ],
             )
             content = response.choices[0].message.content
-            
+
             total_input_words += _word_count(prompt)
             total_output_words += _word_count(content)
-            
+
             eval_data = parse_llm_response(
                 response=content,
                 keys=EVALUATION_CRITERIA,
@@ -184,7 +183,7 @@ def evaluate_dataset(input_file: str, output_file: str):
 
     flush_buffer()
     print(f"Evaluation complete. Saved to {output_file}")
-    
+
     return {"input_words": total_input_words, "output_words": total_output_words}
 
 

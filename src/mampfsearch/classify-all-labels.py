@@ -99,7 +99,7 @@ def classify_segments():
 
                 try:
                     response = llm_client.chat.completions.create(
-                        model="openai/gpt-oss-20b",
+                        model=config.LLM_MODEL_NAME,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_content},

@@ -99,6 +99,7 @@ def generate_unstructured_questions_for_lecture(
     graph_storage,
     sentences_per_chunk: int = 10,
     questions_per_chunk: int = 5,
+    max_chunks: int = None,
 ):
     total_input_words = 0
     total_output_words = 0
@@ -150,6 +151,11 @@ def generate_unstructured_questions_for_lecture(
         return chunks
 
     chunks = split_into_sentence_chunks(full_transcript, sentences_per_chunk)
+    
+    if max_chunks is not None and max_chunks > 0:
+        logger.info(f"Limiting unstructured generation to {max_chunks} chunks.")
+        chunks = chunks[:max_chunks]
+
     logger.info(
         f"Generating unstructured questions from {len(chunks)} transcript chunks (sentences_per_chunk={sentences_per_chunk})."
     )

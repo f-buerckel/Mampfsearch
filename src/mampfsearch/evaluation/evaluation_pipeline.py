@@ -3,7 +3,7 @@ import logging
 import os
 import csv
 from datetime import datetime
-from mampfsearch.utils.config import get_graph_storage
+from mampfsearch.utils import config
 
 # Import from sibling scripts
 from mampfsearch.evaluation.generate_questions_csv import (
@@ -27,7 +27,12 @@ def run_pipeline(
     max_comention_words: int = 1500,
     max_comention_entities: int = 5,
     base_results_dir: str = "Results",
+    test_run: bool = False,
 ):
+    # 0. Configure Model
+    # IMPORTANT: Ensure the pipeline uses the user-specified model, not the hardcoded default.
+    logger.info(f"Configured pipeline to use model: {config.LLM_MODEL_NAME}")
+
     # 1. Setup Run Directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     # Sanitize names for path safety
@@ -40,8 +45,21 @@ def run_pipeline(
     os.makedirs(run_dir, exist_ok=True)
 
     logger.info(
-        f"Starting evaluation pipeline for lecture '{lecture_name}' with model '{model_name}'"
+        f"Starting evaluation pipeline for lecture '{lecture_name}' with model '{model_name}' (Test Run: {test_run})"
     )
+    
+    # Define limits based on run mode
+    if test_run:
+        logger.warning("!!! TEST RUN MODE ENABLED - LIMITING GENERATION AND EVALUATION !!!")
+        top_k_multi_entity = 1
+        max_chunks_unstructured = 1
+        n_pairwise_pairs = 2
+        # Reduce chunks size/questions per chunk to absolute minimum for speed/cost
+        questions_per_chunk = 1
+    else:
+        top_k_multi_entity = 20  # Default or make this an argument
+        max_chunks_unstructured = None # No limit
+        n_pairwise_pairs = 150
     logger.info(f"Results will be stored in: {run_dir}")
 
     # 2. Write Run Info
@@ -57,7 +75,7 @@ def run_pipeline(
         f.write(f"Max Comention Entities: {max_comention_entities}\n")
 
     # 3. Initialize Graph Storage
-    graph_storage = get_graph_storage()
+    graph_storage = config.get_graph_storage()
 
     # 4. Generate Questions
 
@@ -79,6 +97,7 @@ def run_pipeline(
             max_definition_words=max_definition_words,
             max_comention_words=max_comention_words,
             max_comention_entities=max_comention_entities,
+            top_k_generation=top_k_multi_entity,
         )
 
     # 4b. Unstructured Generation
@@ -92,6 +111,7 @@ def run_pipeline(
             graph_storage=graph_storage,
             sentences_per_chunk=sentences_per_chunk,
             questions_per_chunk=questions_per_chunk,
+            max_chunks=max_chunks_unstructured,
         )
 
     # 5. Evaluate Individually
@@ -105,7 +125,9 @@ def run_pipeline(
 
     # 5b. Evaluate Unstructured
     logger.info("Step 4/5: Evaluating Unstructured Questions...")
-    stats_eval_unstructured = evaluate_dataset(gen_unstructured_csv, eval_unstructured_csv)
+    stats_eval_unstructured = evaluate_dataset(
+        gen_unstructured_csv, eval_unstructured_csv
+    )
 
     # 6. Visualize Results
     logger.info("Step 5/5: Generating Visualization Plots...")
@@ -131,39 +153,49 @@ def run_pipeline(
         name_a="Unstructured",
         name_b="Multi-Entity",
         output=pairwise_csv,
-        n_pairs=150,  # Defaulting to 50 for speed, user can adjust if we added arg
-        model="openai/gpt-oss-20b",  # Default judge model
+        n_pairs=n_pairwise_pairs,
+        model=config.LLM_MODEL_NAME,  # Default judge model
     )
 
     logger.info("Pipeline Completed Successfully!")
-    
+
     # Append stats to run_info.txt
     try:
         with open(info_path, "a") as f:
             f.write("\n--- LLM Usage Statistics ---\n")
-            f.write(f"QG Multi-Entity: Input={stats_qg_multi.get('input_words', 0)}, Output={stats_qg_multi.get('output_words', 0)}\n")
-            f.write(f"QG Unstructured: Input={stats_qg_unstructured.get('input_words', 0)}, Output={stats_qg_unstructured.get('output_words', 0)}\n")
-            f.write(f"Eval Multi-Entity: Input={stats_eval_multi.get('input_words', 0)}, Output={stats_eval_multi.get('output_words', 0)}\n")
-            f.write(f"Eval Unstructured: Input={stats_eval_unstructured.get('input_words', 0)}, Output={stats_eval_unstructured.get('output_words', 0)}\n")
-            f.write(f"Pairwise Eval: Input={stats_pairwise.get('input_words', 0)}, Output={stats_pairwise.get('output_words', 0)}\n")
-            
+            f.write(
+                f"QG Multi-Entity: Input={stats_qg_multi.get('input_words', 0)}, Output={stats_qg_multi.get('output_words', 0)}\n"
+            )
+            f.write(
+                f"QG Unstructured: Input={stats_qg_unstructured.get('input_words', 0)}, Output={stats_qg_unstructured.get('output_words', 0)}\n"
+            )
+            f.write(
+                f"Eval Multi-Entity: Input={stats_eval_multi.get('input_words', 0)}, Output={stats_eval_multi.get('output_words', 0)}\n"
+            )
+            f.write(
+                f"Eval Unstructured: Input={stats_eval_unstructured.get('input_words', 0)}, Output={stats_eval_unstructured.get('output_words', 0)}\n"
+            )
+            f.write(
+                f"Pairwise Eval: Input={stats_pairwise.get('input_words', 0)}, Output={stats_pairwise.get('output_words', 0)}\n"
+            )
+
             # Total
             total_input = (
-                stats_qg_multi.get('input_words', 0) + 
-                stats_qg_unstructured.get('input_words', 0) + 
-                stats_eval_multi.get('input_words', 0) + 
-                stats_eval_unstructured.get('input_words', 0) + 
-                stats_pairwise.get('input_words', 0)
+                stats_qg_multi.get("input_words", 0)
+                + stats_qg_unstructured.get("input_words", 0)
+                + stats_eval_multi.get("input_words", 0)
+                + stats_eval_unstructured.get("input_words", 0)
+                + stats_pairwise.get("input_words", 0)
             )
             total_output = (
-                stats_qg_multi.get('output_words', 0) + 
-                stats_qg_unstructured.get('output_words', 0) + 
-                stats_eval_multi.get('output_words', 0) + 
-                stats_eval_unstructured.get('output_words', 0) + 
-                stats_pairwise.get('output_words', 0)
+                stats_qg_multi.get("output_words", 0)
+                + stats_qg_unstructured.get("output_words", 0)
+                + stats_eval_multi.get("output_words", 0)
+                + stats_eval_unstructured.get("output_words", 0)
+                + stats_pairwise.get("output_words", 0)
             )
             f.write(f"TOTAL: Input={total_input}, Output={total_output}\n")
-            
+
         logger.info(f"Appended LLM usage stats to {info_path}")
     except Exception as e:
         logger.error(f"Failed to append stats to run_info.txt: {e}")
@@ -212,6 +244,11 @@ if __name__ == "__main__":
         default=5,
         help="Max number of co-mentioned entities to include.",
     )
+    parser.add_argument(
+        "--test_run",
+        action="store_true",
+        help="Enable test run mode (limits generation and evaluation for low-cost testing).",
+    )
 
     args = parser.parse_args()
 
@@ -223,4 +260,5 @@ if __name__ == "__main__":
         max_definition_words=args.max_definition_words,
         max_comention_words=args.max_comention_words,
         max_comention_entities=args.max_comention_entities,
+        test_run=args.test_run,
     )

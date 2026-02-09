@@ -37,7 +37,7 @@ async def ask(
     logger.info("Generating answer...")
 
     answer = await client.chat.completions.create(
-        model="openai/gpt-oss-20b",
+        model=config.LLM_MODEL_NAME,
         messages=[
             {"role": "system", "content": prompt},
         ],

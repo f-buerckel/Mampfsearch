@@ -1,10 +1,24 @@
-import argparse
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
+
+
+# --- Global configuration (edit these) ------------------------------------
+# Path to the pairwise results CSV/JSON (edit as needed)
+INPUT_PATH = (
+    "/home/fbuerckel/Mampfsearch/Mampfsearch/"
+    "src/mampfsearch/evaluation/Results/18100a-lecture-21-multicam_360p_16_9/gpt-oss_20b_20260208_143908/pairwise_results.csv"
+)
+# Directory to save output images (None => save alongside input)
+OUTPUT_DIR = (
+    "/home/fbuerckel/Mampfsearch/Mampfsearch/"
+    "src/mampfsearch/evaluation/Results/18100a-lecture-21-multicam_360p_16_9/gpt-oss_20b_20260208_143908/"
+)
+# Whether to show plots interactively
+SHOW = False
 
 
 def _load_pairwise_results(path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
@@ -88,36 +102,23 @@ def _outcome_series(df: pd.DataFrame) -> pd.Series:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Create quick plots for pairwise_evaluation outputs (CSV or JSON)."
-    )
-    parser.add_argument(
-        "--input", required=True, help="Path to pairwise output (.csv or .json)"
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Directory to write PNGs into (default: alongside input file)",
-    )
-    parser.add_argument(
-        "--title",
-        default=None,
-        help="Optional plot title (default: derived from input filename)",
-    )
-    parser.add_argument(
-        "--show",
-        action="store_true",
-        help="Also open interactive windows (in addition to saving PNGs)",
-    )
+    # Use top-level globals for configuration: INPUT_PATH, OUTPUT_DIR, SHOW
+    if not INPUT_PATH:
+        print(
+            "Please set INPUT_PATH at the top of the file to the pairwise results path."
+        )
+        raise SystemExit(2)
 
-    args = parser.parse_args()
+    input_path_str = INPUT_PATH
+    output_dir_str = OUTPUT_DIR
+    show = SHOW
 
-    df, meta = _load_pairwise_results(args.input)
+    df, meta = _load_pairwise_results(input_path_str)
     if df.empty:
         raise ValueError("Input contains no matches/rows.")
 
-    input_path = Path(args.input)
-    output_dir = Path(args.output_dir) if args.output_dir else input_path.parent
+    input_path = Path(input_path_str)
+    output_dir = Path(output_dir_str) if output_dir_str else input_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Lazy import so users still get useful 'no pandas' errors earlier.
@@ -150,7 +151,7 @@ def main() -> None:
     invalid = int(counts.get("INVALID", 0))
     total = int(len(df))
 
-    title = args.title or input_path.stem
+    title = input_path.stem
 
     # ---- Plot 1: Overall outcomes ----
     fig1, ax1 = plt.subplots(figsize=(7, 4))
@@ -165,7 +166,7 @@ def main() -> None:
         ax1.text(i, v + 0.2, str(v), ha="center", va="bottom", fontsize=9)
 
     fig1.tight_layout()
-    out1 = output_dir / f"{input_path.stem}_outcomes.png"
+    out1 = output_dir / f"{input_path.stem}_outcomes.svg"
     fig1.savefig(out1, dpi=200)
 
     # ---- Plot 2: Cumulative wins over pairs ----
@@ -238,7 +239,7 @@ def main() -> None:
     if out3:
         print(f"  {out3}")
 
-    if args.show:
+    if show:
         plt.show()
     else:
         plt.close("all")

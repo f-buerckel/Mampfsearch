@@ -9,10 +9,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from mampfsearch.utils import config
 
 import pandas as pd
 
-from mampfsearch.utils.config import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -246,11 +246,10 @@ def judge_pair(
         answer_b=candidate_b.answer,
     )
 
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
     response = llm_client.chat.completions.create(
         model=model,
         temperature=temperature,
-        max_tokens=max_tokens,
         messages=[
             {"role": "system", "content": _DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
@@ -339,7 +338,7 @@ def run_pairwise_evaluation(
     match_on: str = "none",
     seed: int = 0,
     context_words: int = 1200,
-    model: str = "openai/gpt-oss-20b",
+    model: str = config.LLM_MODEL_NAME,
     temperature: float = 0.0,
     max_tokens: int = 100000,
     debug_invalid: bool = False,
@@ -386,9 +385,7 @@ def run_pairwise_evaluation(
     if match_on == "none":
         sampled_pairs = _sample_pairs_none(df_a, df_b, n_pairs, rng)
     else:
-        sampled_pairs = _sample_pairs_match(
-            df_a, df_b, n_pairs, rng, match_on
-        )
+        sampled_pairs = _sample_pairs_match(df_a, df_b, n_pairs, rng, match_on)
 
     os.makedirs("Results", exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -470,12 +467,8 @@ def run_pairwise_evaluation(
             row_a = df_a.loc[idx_a]
             row_b = df_b.loc[idx_b]
 
-            cand_from_csv_a = _row_to_candidate(
-                row_a, name_a, idx_a, context_words
-            )
-            cand_from_csv_b = _row_to_candidate(
-                row_b, name_b, idx_b, context_words
-            )
+            cand_from_csv_a = _row_to_candidate(row_a, name_a, idx_a, context_words)
+            cand_from_csv_b = _row_to_candidate(row_b, name_b, idx_b, context_words)
 
             cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
 
@@ -652,12 +645,8 @@ def run_pairwise_evaluation(
                 row_a = df_a.loc[idx_a]
                 row_b = df_b.loc[idx_b]
 
-                cand_from_csv_a = _row_to_candidate(
-                    row_a, name_a, idx_a, context_words
-                )
-                cand_from_csv_b = _row_to_candidate(
-                    row_b, name_b, idx_b, context_words
-                )
+                cand_from_csv_a = _row_to_candidate(row_a, name_a, idx_a, context_words)
+                cand_from_csv_b = _row_to_candidate(row_b, name_b, idx_b, context_words)
 
                 cand_a, cand_b = _randomize_ab(cand_from_csv_a, cand_from_csv_b, rng)
 
@@ -730,7 +719,9 @@ def run_pairwise_evaluation(
                 else:
                     winner = decision["winner"]
                     if winner in {"A", "B"}:
-                        winner_source = cand_a.source if winner == "A" else cand_b.source
+                        winner_source = (
+                            cand_a.source if winner == "A" else cand_b.source
+                        )
                         if winner_source == name_a:
                             wins_a += 1
                         elif winner_source == name_b:
@@ -765,8 +756,12 @@ def run_pairwise_evaluation(
                 # Write row immediately
                 row_dict = {
                     "pair": i,
-                    "winner": match.get("winner") if winner_ab == "TIE" else (
-                         match["a"]["source"] if winner_ab == "A" else (match["b"]["source"] if winner_ab == "B" else None)
+                    "winner": match.get("winner")
+                    if winner_ab == "TIE"
+                    else (
+                        match["a"]["source"]
+                        if winner_ab == "A"
+                        else (match["b"]["source"] if winner_ab == "B" else None)
                     ),
                     "reasoning": match.get("reasoning"),
                     "a_source": match["a"].get("source", name_a),
@@ -841,7 +836,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="openai/gpt-oss-20b",
+        default=config.LLM_MODEL_NAME,
         help="OpenAI-compatible model name served by vLLM",
     )
     parser.add_argument("--temperature", type=float, default=0.0)
@@ -875,7 +870,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    
+
     run_pairwise_evaluation(
         csv_a=args.csv_a,
         csv_b=args.csv_b,
@@ -893,6 +888,7 @@ def main() -> None:
         sleep=args.sleep,
         output=args.output,
     )
+
 
 if __name__ == "__main__":
     main()

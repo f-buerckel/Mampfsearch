@@ -11,6 +11,7 @@ from mampfsearch.utils.config import (
     get_graph_storage,
     get_embedding_model,
     get_llm_client,
+    LLM_MODEL_NAME,
 )
 from mampfsearch.utils.schema import nodeLabels
 
@@ -105,7 +106,7 @@ def generate_answer(question: str, context_chunks: List[str], llm_client) -> str
 
     try:
         response = llm_client.chat.completions.create(
-            model="openai/gpt-oss-20b",  # Using the model seen in existing code
+            model=LLM_MODEL_NAME,  # Using the model seen in existing code
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},

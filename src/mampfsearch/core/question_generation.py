@@ -1,4 +1,4 @@
-from mampfsearch.utils.config import get_graph_storage, get_llm_client
+from mampfsearch.utils import config
 from mampfsearch.utils.models import SegmentNode, MathEntity
 from mampfsearch.utils import prompts, config
 from typing import List, Optional, Dict, Iterable, Tuple, Set
@@ -191,7 +191,7 @@ def create_multi_entity_segment_spanning_question(
     if current_span:
         spans.append((current_type_lower or "", current_span))
 
-    graph_storage = get_graph_storage()
+    graph_storage = config.get_graph_storage()
 
     # Pre-fetch mentioned entity names per segment for efficient filtering.
     try:
@@ -253,9 +253,9 @@ def create_multi_entity_segment_spanning_question(
         )
         return [], {"input_words": 0, "output_words": 0}
 
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
     questions = []
-    
+
     total_input_words = 0
     total_output_words = 0
 
@@ -403,7 +403,7 @@ def create_multi_entity_segment_spanning_question(
 
         try:
             response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model=config.LLM_MODEL_NAME,
                 temperature=0.0,
                 messages=[
                     {
@@ -446,7 +446,7 @@ def create_multi_entity_segment_spanning_question(
                     answer=a,
                     entity_name=entity_name,
                 )
-                
+
                 total_input_words += eval_stats.get("input_words", 0)
                 total_output_words += eval_stats.get("output_words", 0)
 
@@ -467,7 +467,10 @@ def create_multi_entity_segment_spanning_question(
             logger.error(f"Error during multi-entity spanning question LLM call: {e}")
             continue
 
-    return questions, {"input_words": total_input_words, "output_words": total_output_words}
+    return questions, {
+        "input_words": total_input_words,
+        "output_words": total_output_words,
+    }
 
 
 def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
@@ -518,7 +521,7 @@ def parse_llm_response(response: str, keys: tuple) -> Optional[Dict[str, str]]:
 
 
 def create_factual_questions(segments: List[SegmentNode], entity_name: str):
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
     questions = []
     for segmentNode in segments:
         segment = segmentNode.segment
@@ -528,7 +531,7 @@ def create_factual_questions(segments: List[SegmentNode], entity_name: str):
 
         try:
             response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model=config.LLM_MODEL_NAME,
                 temperature=0.0,
                 messages=[
                     {
@@ -562,7 +565,7 @@ def create_factual_questions(segments: List[SegmentNode], entity_name: str):
 
 # TODO: Dry it up
 def create_multiple_choice_question(segments: List[SegmentNode], entity_name: str):
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
     questions = []
     for segmentNode in segments:
         segment = segmentNode.segment
@@ -572,7 +575,7 @@ def create_multiple_choice_question(segments: List[SegmentNode], entity_name: st
 
         try:
             response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model=config.LLM_MODEL_NAME,
                 temperature=0.0,
                 messages=[
                     {
@@ -684,8 +687,8 @@ def create_multiple_segment_spanning_question(
         if about and entity_name and about.lower() == entity_name.lower():
             valid_spans.append(span)
 
-    llm_client = get_llm_client()
-    graph_storage = get_graph_storage()
+    llm_client = config.get_llm_client()
+    graph_storage = config.get_graph_storage()
     questions = []
 
     for span in valid_spans:
@@ -719,7 +722,7 @@ def create_multiple_segment_spanning_question(
 
         try:
             response = llm_client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model=config.LLM_MODEL_NAME,
                 temperature=0.0,
                 messages=[
                     {
@@ -806,7 +809,7 @@ def evaluate_question(
 
 
 def generate_unstructured_questions(context: str, n_questions: int = 10):
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
 
     prompt = prompts.CREATE_UNSTRUCTURED_QUESTION_PROMPT_NO_ENTITY.format(
         context=context, n_questions=n_questions
@@ -817,7 +820,7 @@ def generate_unstructured_questions(context: str, n_questions: int = 10):
 
     try:
         response = llm_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=config.LLM_MODEL_NAME,
             temperature=0.0,
             messages=[
                 {
@@ -832,16 +835,18 @@ def generate_unstructured_questions(context: str, n_questions: int = 10):
         )
         content = response.choices[0].message.content
         output_words = _word_count(content)
-        
-        response_dict = parse_llm_response(response=content, keys=("questions", "answers"))
-        
+
+        response_dict = parse_llm_response(
+            response=content, keys=("questions", "answers")
+        )
+
         questions = []
         if response_dict:
             questions = [
                 {"question": q, "answer": a}
                 for q, a in zip(response_dict["questions"], response_dict["answers"])
             ]
-        
+
         return questions, {"input_words": prompt_words, "output_words": output_words}
 
     except Exception as e:
@@ -852,7 +857,7 @@ def generate_unstructured_questions(context: str, n_questions: int = 10):
 def evaluate_question_with_llm(
     context: str, question: str, answer: str, entity_name: str
 ) -> Tuple[float, Dict[str, int]]:
-    llm_client = get_llm_client()
+    llm_client = config.get_llm_client()
     prompt = prompts.QUESTION_EVALUATION_PROMPT.format(
         context=context, entity_name=entity_name, question=question, answer=answer
     )
@@ -862,7 +867,7 @@ def evaluate_question_with_llm(
 
     try:
         response = llm_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=config.LLM_MODEL_NAME,
             temperature=0.0,
             messages=[
                 {
@@ -877,7 +882,7 @@ def evaluate_question_with_llm(
         )
         content = response.choices[0].message.content
         output_words = _word_count(content)
-        
+
         response_dict = parse_llm_response(
             response=content,
             keys=(
@@ -893,7 +898,10 @@ def evaluate_question_with_llm(
             # scores = {key: int(response_dict[key]) for key in response_dict.keys()}
 
             # return the average score:
-            return response_dict, {"input_words": prompt_words, "output_words": output_words}
+            return response_dict, {
+                "input_words": prompt_words,
+                "output_words": output_words,
+            }
             # return sum(scores.values()) / len(scores)
 
         else:

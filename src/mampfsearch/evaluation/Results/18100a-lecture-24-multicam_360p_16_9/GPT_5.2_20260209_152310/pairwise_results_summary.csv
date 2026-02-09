@@ -1,0 +1,2 @@
+csv_a,csv_b,name_a,name_b,n_pairs,match_on,seed,model,temperature,max_tokens,context_words,wins_a,wins_b,ties,invalid
+Results/18100a-lecture-24-multicam_360p_16_9/GPT_5.2_20260209_152310/generated_unstructured.csv,Results/18100a-lecture-24-multicam_360p_16_9/GPT_5.2_20260209_152310/generated_multi.csv,Unstructured,Multi-Entity,150,none,0,gpt-5.2,0.0,100000,1200,0,0,0,0

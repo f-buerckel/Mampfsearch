@@ -167,9 +167,7 @@ def plot_radar_chart(df, output_dir, qg_model, eval_model):
     ax.set_title(
         "Average Performance by Criterion"
         + "\n"
-        + _model_info_text(qg_model, eval_model)
-        + "\n"
-        + _get_sample_size_text(df),
+        + _model_info_text(qg_model, eval_model),
         y=RADAR_TITLE_Y,
         pad=TITLE_PAD,
         fontsize=13,
@@ -243,11 +241,7 @@ def plot_box_chart(df, output_dir, qg_model, eval_model):
             ax.legend(handles[:n], labels, loc="lower right")
 
     ax.set_title(
-        "Score Distributions"
-        + "\n"
-        + _model_info_text(qg_model, eval_model)
-        + "\n"
-        + _get_sample_size_text(df),
+        "Score Distributions" + "\n" + _model_info_text(qg_model, eval_model),
         fontsize=13,
         pad=TITLE_PAD,
     )
@@ -267,7 +261,7 @@ def plot_box_chart(df, output_dir, qg_model, eval_model):
 # --- Plot 3: Stacked Bar (Problem Criteria) ---
 def plot_problem_criteria(df, output_dir, qg_model, eval_model):
     print("Generating Stacked Bar Chart...")
-    # Focus on Complexity and Independence
+    # Focus on Complexity, Integration, and Independence
     target_cols = ["educational_complexity_score"]
 
     df_melted = df.melt(
@@ -306,9 +300,7 @@ def plot_problem_criteria(df, output_dir, qg_model, eval_model):
     ax.set_title(
         "Distribution across Complexity"
         + "\n"
-        + _model_info_text(qg_model, eval_model)
-        + "\n"
-        + _get_sample_size_text(df),
+        + _model_info_text(qg_model, eval_model),
         fontsize=13,
         pad=TITLE_PAD,
     )
@@ -326,7 +318,11 @@ def plot_problem_criteria(df, output_dir, qg_model, eval_model):
 
 
 def generate_evaluation_plots(
-    baseline_csv, proposed_csv, output_dir, qg_model=DEFAULT_QUESTION_GENERATION_MODEL, eval_model=DEFAULT_EVALUATION_MODEL
+    baseline_csv,
+    proposed_csv,
+    output_dir,
+    qg_model=DEFAULT_QUESTION_GENERATION_MODEL,
+    eval_model=DEFAULT_EVALUATION_MODEL,
 ):
     # Ensure matplotlib doesn't try to open a window if no backend is present
     plt.switch_backend("Agg")

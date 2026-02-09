@@ -10,6 +10,10 @@ QDRANT_PORT = 6333
 
 VLLM_HOST = "localhost"
 VLLM_PORT = 8001
+LLM_MODEL_NAME = "openai/gpt-oss-20b"
+# LLM_MODEL_NAME = "gpt-5.2"
+LOCAL_LLM = True
+API_KEY = os.getenv("OPENAI_API_KEY")
 
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIMENSION = 1024
@@ -96,9 +100,12 @@ def get_async_llm_client():
     if _async_llm_client is None:
         from openai import AsyncOpenAI
 
-        _async_llm_client = AsyncOpenAI(
-            base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
-        )
+        if LOCAL_LLM:
+            _async_llm_client = AsyncOpenAI(
+                base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
+            )
+        else:
+            _async_llm_client = AsyncOpenAI(api_key=API_KEY)
 
     return _async_llm_client
 
@@ -111,9 +118,12 @@ def get_llm_client():
     if _llm_client is None:
         from openai import OpenAI
 
-        _llm_client = OpenAI(
-            base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
-        )
+        if LOCAL_LLM:
+            _llm_client = OpenAI(
+                base_url=f"http://{VLLM_HOST}:{VLLM_PORT}/v1", api_key="dummy"
+            )
+        else:
+            _llm_client = OpenAI(api_key=API_KEY)
 
     return _llm_client
 

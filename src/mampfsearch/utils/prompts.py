@@ -474,7 +474,7 @@ Return the output in the following JSON format:
 
 EVALUATION_PROMPT = """
 ### SYSTEM ROLE
-You are an expert university pedagogue and NLP evaluator. Your task is to rigorously evaluate the quality of a generated exam question-answer pair based *only* on the provided source context.
+You are an expert university pedagogue and NLP evaluator specializing in mathematical didactics. Your task is to rigorously evaluate the quality of a generated exam question-answer pair based *only* on the provided source context.
 
 ### INPUT DATA
 - **Source Context:** {context}
@@ -486,43 +486,45 @@ Rate each of the following 9 criteria on a scale of 1-5.
 
 #### A. Linguistic Quality
 1. **Clarity**: Is the question unambiguous and specific?
-   - 1: Vague or confusing; multiple interpretations possible.
-   - 5: Crystal clear intent and meaning.
+   - 1: Vague, grammatical errors, or multiple interpretations possible.
+   - 5: Precise mathematical terminology; crystal clear intent.
 2. **Conciseness**: Is it free from unnecessary verbosity?
    - 1: Extremely verbose or contains redundant modifiers.
    - 5: Concise and to the point.
 
 #### B. Content Alignment (Grounding)
-3. **Relevance**: Does it target key information from the text?
-   - 1: Asks about trivial/irrelevant details.
-   - 5: Targets the core concept of the passage.
+3. **Relevance**: Does it target key mathematical concepts from the text?
+   - 1: Asks about trivial details (e.g., variable names, historical dates).
+   - 5: Targets core theorems, definitions, or proofs central to the passage.
 4. **Consistency**: Is it factually aligned with the passage?
-   - 1: Contradicts the text or hallucinates facts.
-   - 5: Perfectly consistent with the source.
-5. **Answerability**: Can the answer be found in the given context and only very basic external knowledge?
-   - 1: Impossible to answer given only this context chunk.
-   - 5: Answer is explicitly and clearly in the text.
+   - 1: Contradicts the text or hallucinates facts/theorems.
+   - 5: Perfectly consistent with the source definitions and logic.
+5. **Answerability**: Can the answer be derived strictly from the given context?
+   - 1: Impossible to answer without external knowledge not present in the chunk.
+   - 5: Answer is explicitly supported by the text.
 
 6. **Answer Consistency**: Does the provided answer actually answer the question asked?
-  - 1: The answer does not match the question (wrong target, incomplete, or off-topic).
-  - 5: The answer perfectly addresses the specific question.
+- 1: The answer does not match the question (wrong target, incomplete, or off-topic).
+- 5: The answer perfectly addresses the specific question. 
 
-#### C. Pedagogical Value
-7. **Educational Complexity**: What level of cognitive effort is required (Bloom's Taxonomy) and how much information is needed? Does it require more than a single fact or concept?
-  - 1: Simple Recall (e.g., "What is X?").
-  - 2: Basic Understanding (e.g., "State the definition/meaning of X." / "Identify a stated property of X.").
-  - 3: Application/Inference (e.g., "Why does X happen?" / "Use the stated rule to determine ...").
-  - 4: Analysis/Integration (e.g., "How does X relate to Y according to the text?" / "Explain a consequence of the definition.").
-  - 5: Synthesis/Evaluation (e.g., "Compare X and Y..." / "Argue which approach is preferable and why.").
+#### C. Pedagogical Value (The Critical Metrics)
+*Note: Be strict. Do not inflate scores for questions that merely ask "Why" if the text explicitly provides the "Because".*
 
-8. **Independence (Answer Leakage)**: Does the question leak the answer?
-   - 1: The question gives away the answer (e.g., "Since X is Y, why...?").
-   - 5: The question stands alone without hinting at the solution.
+7. **Educational complexity (Strict Bloom's)**: What level of mental processing is required?
+   - 1: **Recall/Recognition**: Retrieving a fact, definition, or formula verbatim from the text. (e.g., "Define X").
+   - 2: **Comprehension**: Explaining a concept in own words or simple translation.
+   - 3: **Application**: Using a rule/formula to solve a standard problem or instantiate a definition.
+   - 4: **Analysis**: Breaking down a proof, finding unstated assumptions, or contrasting components. (Must require inference, not just retrieval of an explanation).
+   - 5: **Synthesis/Evaluation**: Constructing a new proof sketch, connecting previously unrelated domains, or judging the validity of a statement.
+
+8. **Independence**: Does the question leak the answer?
+   - 1: The question contains the answer or a strong hint (e.g., "Since X is true, why...?").
+   - 5: The question is self-contained and tests knowledge without leaking.
+
 #### D. Holistic Assessment
-9. **Overall Quality**: A holistic score considering all factors, with a strong emphasis on educational objectives.
-  - Educational value is crucial: prioritize questions that test understanding and the combination/integration of concepts (i.e., higher Educational Complexity).
-  - Penalize questions that are merely simple recall, even if they are clear and factually consistent.
-  - If a question fails on critical issues (e.g., hallucination/ungrounded content, or answer leakage), this score should be low regardless of linguistic features.
+9. **Overall Educational Value**: A weighted score prioritizing Relational Integration and Cognitive Demand.
+   - High scores (4-5) require the question to test *understanding of relationships* rather than just memory.
+   - Penalize "Jeopardy-style" questions (simple fact retrieval) even if they are clear.
 
 ### OUTPUT FORMAT
 Return valid JSON only. Structure:
