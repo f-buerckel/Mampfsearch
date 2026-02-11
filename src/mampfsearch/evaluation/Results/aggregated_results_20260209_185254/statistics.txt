@@ -1,0 +1,32 @@
+=== Aggregation Statistics ===
+Total Evaluated Questions: 2273
+
+-- Distribution by Method --
+Baseline (Unstructured): 1304
+Proposed (Hybrid): 969
+
+-- Average Scores --
+                         conciseness_score  answer_consistency_score  educational_complexity_score  independence_score  overall_review_score
+Method                                                                                                                                      
+Baseline (Unstructured)           4.444700                  4.895545                      3.155146            4.480799              3.899002
+Proposed (Hybrid)                 4.265496                  4.920455                      3.560950            4.472107              4.128616
+
+
+=== Outlier Detection (by Lecture) ===
+
+Scanning outliers for Proposed (Hybrid)...
+Global Mean (overall_review_score): 4.13
+
+Scanning outliers for Baseline (Unstructured)...
+Global Mean (overall_review_score): 3.90
+
+
+=== Pairwise Statistics ===
+winner_clean
+Multi-Entity    1334
+Unstructured     750
+TIE              163
+
+
+-- Win Rate Outliers (by Run) --
+Global Multi-Entity Win Rate: 59.29%

@@ -47,10 +47,12 @@ def run_pipeline(
     logger.info(
         f"Starting evaluation pipeline for lecture '{lecture_name}' with model '{model_name}' (Test Run: {test_run})"
     )
-    
+
     # Define limits based on run mode
     if test_run:
-        logger.warning("!!! TEST RUN MODE ENABLED - LIMITING GENERATION AND EVALUATION !!!")
+        logger.warning(
+            "!!! TEST RUN MODE ENABLED - LIMITING GENERATION AND EVALUATION !!!"
+        )
         top_k_multi_entity = 1
         max_chunks_unstructured = 1
         n_pairwise_pairs = 2
@@ -58,7 +60,7 @@ def run_pipeline(
         questions_per_chunk = 1
     else:
         top_k_multi_entity = 20  # Default or make this an argument
-        max_chunks_unstructured = None # No limit
+        max_chunks_unstructured = None  # No limit
         n_pairwise_pairs = 150
     logger.info(f"Results will be stored in: {run_dir}")
 
@@ -137,7 +139,7 @@ def run_pipeline(
         proposed_csv=eval_multi_csv,
         output_dir=run_dir,
         qg_model=model_name,
-        eval_model="gpt-oss-20b",  # Assuming evaluation is done by the default model in evaluate_dataset
+        eval_model=model_name,  # Assuming evaluation is done by the default model in evaluate_dataset
     )
 
     # 7. Pairwise Evaluation

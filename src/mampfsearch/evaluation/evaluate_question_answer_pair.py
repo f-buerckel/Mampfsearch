@@ -14,8 +14,8 @@ import os
 # INPUT_CSV = "Results/Lecture21/gpt-oss-5-feb/generated_multi_questions_21.csv"
 # OUTPUT_CSV = "Results/Lecture21/gpt-oss-5-feb/evaluated_multi_questions_gemma.csv"
 
-INPUT_CSV = "generated_multi_questions.csv"
-OUTPUT_CSV = "evaluated_multi_questions.csv"
+INPUT_CSV = "generated_multi.csv"
+OUTPUT_CSV = "evaluated_multi_gpt5.csv"
 
 logger = logging.getLogger(__name__)
 

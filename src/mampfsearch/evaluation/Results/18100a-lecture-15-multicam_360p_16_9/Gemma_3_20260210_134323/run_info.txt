@@ -1,0 +1,16 @@
+Lecture Name: 18100a-lecture-15-multicam_360p_16_9
+Model Name: Gemma 3
+Timestamp: 20260210_134323
+Sentences Per Chunk: 10
+Questions Per Chunk: 1
+Max Definition Words: 500
+Max Comention Words: 1500
+Max Comention Entities: 5
+
+--- LLM Usage Statistics ---
+QG Multi-Entity: Input=254526, Output=41155
+QG Unstructured: Input=24593, Output=4604
+Eval Multi-Entity: Input=207990, Output=44570
+Eval Unstructured: Input=46016, Output=18117
+Pairwise Eval: Input=49509, Output=12203
+TOTAL: Input=582634, Output=120649

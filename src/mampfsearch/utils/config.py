@@ -10,9 +10,10 @@ QDRANT_PORT = 6333
 
 VLLM_HOST = "localhost"
 VLLM_PORT = 8001
-LLM_MODEL_NAME = "openai/gpt-oss-20b"
-# LLM_MODEL_NAME = "gpt-5.2"
-LOCAL_LLM = True
+# LLM_MODEL_NAME = "leon-se/gemma-3-27b-it-qat-W4A16-G128"
+# LLM_MODEL_NAME = "openai/gpt-oss-20b"
+LLM_MODEL_NAME = "gpt-5.2"
+LOCAL_LLM = False
 API_KEY = os.getenv("OPENAI_API_KEY")
 
 EMBEDDING_MODEL = "BAAI/bge-m3"

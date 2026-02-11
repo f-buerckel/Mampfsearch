@@ -7,8 +7,8 @@ import os
 
 # --- Configuration ---
 # Defaults (can be overridden by arguments)
-DEFAULT_QUESTION_GENERATION_MODEL = "gpt-oss 20b"
-DEFAULT_EVALUATION_MODEL = "gpt-oss 20b"
+DEFAULT_QUESTION_GENERATION_MODEL = "Gpt 5.2"
+DEFAULT_EVALUATION_MODEL = "Gpt 5.2"
 
 # Title/spacing tuning
 TITLE_PAD = 18  # vertical space between title and axes (in points)
@@ -353,4 +353,11 @@ def generate_evaluation_plots(
 if __name__ == "__main__":
     # Example usage (adjust as needed or rely on defaults/imports)
     # generate_evaluation_plots(...)
+    generate_evaluation_plots(
+        baseline_csv="evaluated_unstructured_gpt5.csv",
+        proposed_csv="evaluated_multi_gpt5.csv",
+        output_dir=".",
+        qg_model="Gemma 3",
+        eval_model="GPT 5.2",
+    )
     pass

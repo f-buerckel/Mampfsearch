@@ -1,0 +1,16 @@
+Lecture Name: 18100a-lecture-24-multicam_360p_16_9
+Model Name: GPT 5.2
+Timestamp: 20260209_152310
+Sentences Per Chunk: 10
+Questions Per Chunk: 1
+Max Definition Words: 500
+Max Comention Words: 1500
+Max Comention Entities: 5
+
+--- LLM Usage Statistics ---
+QG Multi-Entity: Input=170862, Output=41711
+QG Unstructured: Input=32489, Output=8243
+Eval Multi-Entity: Input=133807, Output=28637
+Eval Unstructured: Input=64980, Output=28254
+Pairwise Eval: Input=61566, Output=10801
+TOTAL: Input=463704, Output=117646
